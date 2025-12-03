@@ -2,6 +2,9 @@
 
 Play HLS adaptive video streams and standard video files directly in Directus with a customizable video player interface.
 
+<img width="511" height="309" alt="image" src="https://raw.githubusercontent.com/user-attachments/assets/61ca15e7-55ee-4d4d-a697-8e0ac15f3374" />
+
+
 ## Overview
 
 This extension adds a video player interface to your Directus fields, allowing you to play adaptive HLS (m3u8) local or remote streams and standard video files (MP4, etc.) directly in the Data Studio. It works with both string fields (for stream links) and file fields (for uploaded videos).
