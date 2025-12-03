@@ -1,0 +1,37 @@
+{
+	"name": "directus-extension-streaming-video-player",
+	"description": "Play HLS (m3u8) video streams and standard video files on item/file detail page with this enhanced video player interface",
+	"icon": "play_circle",
+  "version": "1.0.0",
+	"license": "MIT",
+	"keywords": [
+		"directus",
+		"directus-extension",
+		"directus-custom-interface",
+		"video",
+		"player",
+		"hls",
+		"streaming"
+	],
+	"type": "module",
+	"directus:extension": {
+		"type": "interface",
+		"path": "dist/index.js",
+		"source": "src/index.ts",
+		"host": "^10.1.14"
+	},
+	"scripts": {
+		"build": "directus-extension build",
+		"dev": "directus-extension build -w --no-minify",
+		"link": "directus-extension link"
+	},
+	"devDependencies": {
+		"@directus/extensions-sdk": "^12.1.0",
+		"vue": "^3.3.7",
+		"typescript": "^5.0.0"
+	},
+	"dependencies": {
+		"hls.js": "^1.4.12",
+		"crypto-js": "^4.2.0"
+	}
+}
