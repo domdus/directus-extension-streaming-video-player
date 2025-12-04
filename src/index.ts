@@ -229,7 +229,7 @@ export default defineInterface({
 					interface: 'presentation-notice',
 					special: ['alias', 'no-data'],
 					options: {
-						text: 'Setup complete for basic usage',
+						text: 'Setup complete for basic usage of the player',
 						color: 'info'
 					}
 				}
@@ -246,7 +246,7 @@ export default defineInterface({
 					options: {
 						placeholder: 'image'
 					},
-					note: 'Optional: Name of the field that contains the poster image. Can be a file field (UUID) or string field (full URL)'
+					note: 'Optional: Name of the field that contains the poster image. Can be a file field (UID) or string field (full URL)'
 				},
 				schema: {
 					default_value: 'image'
@@ -378,7 +378,7 @@ export default defineInterface({
 				interface: 'presentation-notice',
 				special: ['alias', 'no-data'],
 				options: {
-					text: 'Setup complete for basic usage',
+					text: 'Setup complete for basic usage of the player',
 					color: 'info'
 				}
 			}
