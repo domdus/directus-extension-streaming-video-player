@@ -17,6 +17,7 @@
 			:input-placeholder="inputPlaceholder"
 			:processed-value="processedValue"
 			@update:value="handleStringInput"
+			@focus="startEditing"
 			@blur="finishEditing"
 			@loaded="onVideoLoaded"
 			@fullscreen="openFullscreen"
@@ -133,6 +134,9 @@ const fileFieldRef = ref<InstanceType<typeof FileFieldSection> | null>(null);
 const editDrawerRef = ref<InstanceType<typeof FileEditDrawer> | null>(null);
 const useHls = ref(true);
 
+// Timeout for src check watcher
+let srcCheckTimeout: ReturnType<typeof setTimeout> | null = null;
+
 // Composables
 const { fileData, loading, loadFileData, clearFileData } = useFileData();
 const { inputOptions, inputPlaceholder, processValue } = useInputOptions(attrs);
@@ -180,6 +184,7 @@ const {
 	isEditingStringField,
 	editingValue,
 	editStringField,
+	startEditing,
 	clearStringField,
 	handleStringInput,
 	finishEditing,
@@ -245,7 +250,7 @@ watch([stringFieldRef, fileFieldRef], () => {
 		} else if (!isStringField.value && fileFieldRef.value?.videoElement) {
 			videoElement.value = fileFieldRef.value.videoElement;
 			// Setup player after video element is synced
-			if (props.value && fileData.value) {
+			if (props.value && fileData.value && isVideoFile.value) {
 				setupVideoPlayer();
 			}
 		} else if (isStringField.value && stringFieldRef.value && !stringFieldRef.value.videoElement) {
@@ -283,6 +288,32 @@ watch([stringFieldRef, fileFieldRef], () => {
 		}
 	});
 }, { immediate: true });
+
+// Watch for fileFieldRef videoElement changes specifically (handles re-renders after flows)
+watch(() => fileFieldRef.value?.videoElement, (newVideoEl, oldVideoEl) => {
+	// Skip for replacement player case
+	if (shouldReplaceDefaultPlayer.value) {
+		return;
+	}
+	
+	// Skip for string fields
+	if (isStringField.value) {
+		return;
+	}
+	
+	// Don't initialize player while user is editing - wait until they save
+	if (isEditingStringField.value) {
+		return;
+	}
+	
+	// If video element changed and we have the necessary data, reinitialize
+	if (newVideoEl && newVideoEl !== oldVideoEl && props.value && fileData.value && isVideoFile.value) {
+		videoElement.value = newVideoEl;
+		nextTick(() => {
+			setupVideoPlayer();
+		});
+	}
+});
 
 // Watch for videoElement to become available and setup player - ONLY for regular interface cases
 watch(videoElement, (newElement) => {
@@ -328,6 +359,134 @@ watch(streamUrlFromValue, (newStreamUrl) => {
 		});
 	}
 });
+
+// Watch for fileData changes to re-setup player for file fields - handles flow updates
+watch(fileData, (newFileData, oldFileData) => {
+	// Skip for replacement player case
+	if (shouldReplaceDefaultPlayer.value) {
+		return;
+	}
+	
+	// Skip for string fields
+	if (isStringField.value) {
+		return;
+	}
+	
+	// Reinitialize if fileData exists and we have a video element
+	if (newFileData && isVideoFile.value) {
+		// Check if fileData changed (different ID or different stream link)
+		const fileDataChanged = !oldFileData || 
+			oldFileData.id !== newFileData.id ||
+			(streamLinkFieldName.value && oldFileData[streamLinkFieldName.value] !== newFileData[streamLinkFieldName.value]);
+		
+		// Also check if video element has lost its src (even if fileData didn't change)
+		const currentVideoEl = fileFieldRef.value?.videoElement || videoElement.value;
+		const hasSrc = currentVideoEl && (
+			currentVideoEl.src || 
+			currentVideoEl.getAttribute('src') || 
+			currentVideoEl.querySelector('source')?.getAttribute('src') ||
+			hlsInstance.value?.url
+		);
+		
+		// Reinitialize if fileData changed OR if video element has no src
+		if (fileDataChanged || !hasSrc) {
+			nextTick(() => {
+				// Re-sync video element reference if needed
+				if (!videoElement.value && fileFieldRef.value?.videoElement) {
+					videoElement.value = fileFieldRef.value.videoElement;
+				}
+				if (videoElement.value) {
+					setupVideoPlayer();
+				}
+			});
+		}
+	}
+}, { deep: true });
+
+// Watch for item prop changes (e.g., after save-and-stay or flow triggers)
+// This handles cases where the item data refreshes but value stays the same
+watch(() => props.item, () => {
+	// Skip for replacement player case
+	if (shouldReplaceDefaultPlayer.value) {
+		return;
+	}
+	
+	// Skip for string fields
+	if (isStringField.value) {
+		return;
+	}
+	
+	// Don't initialize player while user is editing - wait until they save
+	if (isEditingStringField.value) {
+		return;
+	}
+	
+	// If we have a value and fileData, reinitialize the player
+	if (props.value && fileData.value && isVideoFile.value) {
+		nextTick(() => {
+			// Re-sync video element reference if needed
+			if (!videoElement.value && fileFieldRef.value?.videoElement) {
+				videoElement.value = fileFieldRef.value.videoElement;
+			}
+			if (videoElement.value) {
+				setupVideoPlayer();
+			}
+		});
+	}
+}, { deep: true });
+
+// Watch for video element losing its src (e.g., after flow runs) and reinitialize
+// This handles cases where flows cause re-renders and the player loses its src
+watch([videoElement, () => props.value, fileData, streamUrlFromValue], () => {
+	// Skip for replacement player case
+	if (shouldReplaceDefaultPlayer.value) {
+		return;
+	}
+	
+	// Don't initialize player while user is editing - wait until they save
+	if (isEditingStringField.value) {
+		return;
+	}
+	
+	// Debounce the check to avoid excessive calls
+	if (srcCheckTimeout) {
+		clearTimeout(srcCheckTimeout);
+	}
+	
+	srcCheckTimeout = setTimeout(() => {
+		// Check if video element exists but has no src when it should
+		const currentVideoElement = videoElement.value || 
+			(isStringField.value ? stringFieldRef.value?.videoElement : fileFieldRef.value?.videoElement);
+		
+		if (currentVideoElement && props.value) {
+			const hasSrc = currentVideoElement.src || 
+				currentVideoElement.getAttribute('src') || 
+				currentVideoElement.querySelector('source')?.getAttribute('src');
+			
+			// Check if HLS is being used (hlsInstance would have a src)
+			const hasHlsSrc = hlsInstance.value?.url;
+			
+			const shouldHaveSrc = (isStringField.value && streamUrlFromValue.value) || 
+				(!isStringField.value && fileData.value && isVideoFile.value);
+			
+			// If video element should have src but doesn't, reinitialize
+			if (shouldHaveSrc && !hasSrc && !hasHlsSrc) {
+				nextTick(() => {
+					// Re-sync video element reference if needed
+					if (isStringField.value && stringFieldRef.value?.videoElement) {
+						videoElement.value = stringFieldRef.value.videoElement;
+					} else if (!isStringField.value && fileFieldRef.value?.videoElement) {
+						videoElement.value = fileFieldRef.value.videoElement;
+					}
+					
+					if (videoElement.value) {
+						setupVideoPlayer();
+					}
+				});
+			}
+		}
+	}, 300); // Debounce by 300ms
+}, { immediate: false });
 
 // Watch for useHls changes and update preload attribute
 watch(useHls, (newValue) => {
@@ -516,6 +675,10 @@ onMounted(() => {
 onUnmounted(() => {
 	cleanupHls();
 	cleanupReplacementPlayer();
+	if (srcCheckTimeout) {
+		clearTimeout(srcCheckTimeout);
+		srcCheckTimeout = null;
+	}
 });
 </script>
 

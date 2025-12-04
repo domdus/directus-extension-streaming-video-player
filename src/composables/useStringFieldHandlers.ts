@@ -19,6 +19,15 @@ export function useStringFieldHandlers(
 		isEditingStringField.value = true;
 	};
 
+	const startEditing = () => {
+		// Enter editing mode when input is focused
+		// This prevents the input from disappearing when pasting/typing
+		if (!isEditingStringField.value) {
+			editingValue.value = props.value || '';
+			isEditingStringField.value = true;
+		}
+	};
+
 	const clearStringField = () => {
 		// Clear both the editing value and emit to parent
 		editingValue.value = null;
@@ -98,6 +107,7 @@ export function useStringFieldHandlers(
 		isEditingStringField,
 		editingValue,
 		editStringField,
+		startEditing,
 		clearStringField,
 		handleStringInput,
 		finishEditing,

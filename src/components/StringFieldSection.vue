@@ -12,6 +12,7 @@
 				:autocomplete="inputOptions.masked ? 'off' : undefined"
 				:type="inputOptions.masked ? 'password' : 'text'"
 				@update:model-value="$emit('update:value', $event)"
+				@focus="$emit('focus')"
 				@blur="$emit('blur')"
 			/>
 			<!-- Soft length indicator -->
@@ -111,6 +112,7 @@ defineProps<Props>();
 
 defineEmits<{
 	'update:value': [value: string | null];
+	focus: [];
 	blur: [];
 	loaded: [];
 	fullscreen: [];

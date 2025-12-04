@@ -224,18 +224,107 @@ export function useReplacementPlayer(
 			defaultVideo.removeAttribute('poster');
 			defaultVideo.poster = '';
 			
-			// Setup HLS on the default video element
-			setupHlsPlayer(defaultVideo as HTMLVideoElement, streamUrl);
-			
-			// Hide the default video's loading spinner
-			defaultVideo.setAttribute('preload', 'none');
+			// Ensure video element has full width styling from the start
+			const videoEl = defaultVideo as HTMLVideoElement;
+			videoEl.style.width = '100%';
+			videoEl.style.height = 'auto';
+			videoEl.style.display = 'block';
+			videoEl.style.aspectRatio = '16 / 9';
+			videoEl.style.maxWidth = '100%';
+			videoEl.style.minWidth = '100%';
+			videoEl.style.objectFit = 'contain';
 			
 			// Make video container relative for absolute positioning of overlay
-			const videoContainer = defaultVideo.parentElement;
+			const videoContainer = videoEl.parentElement;
 			if (videoContainer && !videoContainer.classList.contains('video-container-wrapper')) {
 				videoContainer.style.position = 'relative';
+				videoContainer.style.width = '100%';
+				videoContainer.style.maxWidth = '100%';
 				videoContainer.classList.add('video-container-wrapper');
 			}
+			
+			// Ensure full width is maintained when HLS metadata loads or quality changes
+			const ensureFullWidth = () => {
+				// Force full width on video element
+				videoEl.style.width = '100%';
+				videoEl.style.maxWidth = '100%';
+				videoEl.style.minWidth = '100%';
+				
+				// Ensure container is also full width
+				if (videoContainer) {
+					videoContainer.style.width = '100%';
+					videoContainer.style.maxWidth = '100%';
+				}
+				
+				// Force a reflow to ensure styles are applied
+				void videoEl.offsetWidth;
+			};
+			
+			// For HLS.js, create a custom HLS instance to track level changes
+			if (Hls.isSupported()) {
+				// Create HLS instance specifically for replacement player to track events
+				const hls = new Hls({
+					enableWorker: true,
+					lowLatencyMode: true,
+					backBufferLength: 90,
+					autoStartLoad: true,
+					maxBufferLength: 3,
+					maxMaxBufferLength: 6,
+					maxBufferSize: 60 * 1000 * 1000
+				});
+				
+				hls.loadSource(streamUrl);
+				hls.attachMedia(videoEl);
+				
+				// Store HLS instance for cleanup
+				replacementHlsInstance.value = hls;
+				
+				// Listen for level changes (quality switches) - this is the key fix
+				hls.on(Hls.Events.LEVEL_SWITCHED, () => {
+					ensureFullWidth();
+					// Also trigger after a delay to ensure layout has updated
+					setTimeout(ensureFullWidth, 50);
+				});
+				
+				hls.on(Hls.Events.LEVEL_LOADED, () => {
+					ensureFullWidth();
+				});
+				
+				// Listen for manifest parsed to ensure initial sizing
+				hls.on(Hls.Events.MANIFEST_PARSED, () => {
+					ensureFullWidth();
+					setTimeout(ensureFullWidth, 100);
+				});
+				
+				// Add play event listener
+				const onPlayHandler = () => {
+					if (hls) {
+						hls.startLoad();
+						videoEl.removeEventListener('play', onPlayHandler);
+					}
+				};
+				videoEl.addEventListener('play', onPlayHandler);
+			} else {
+				// For native HLS (Safari), use the setupHlsPlayer
+				setupHlsPlayer(videoEl, streamUrl);
+			}
+			
+			// Hide the default video's loading spinner
+			videoEl.setAttribute('preload', 'none');
+			
+			// Listen for metadata loaded to ensure proper sizing (for both HLS.js and native)
+			videoEl.addEventListener('loadedmetadata', () => {
+				ensureFullWidth();
+				// Also trigger after a small delay to catch any layout shifts
+				setTimeout(ensureFullWidth, 100);
+			});
+			
+			videoEl.addEventListener('loadeddata', () => {
+				ensureFullWidth();
+			});
+			
+			// Listen for resize events (when quality changes might cause dimension changes)
+			videoEl.addEventListener('resize', ensureFullWidth);
 			
 			// Load file data to get type
 			if (currentFileId.value) {
