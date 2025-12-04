@@ -12,6 +12,7 @@ This extension adds a video player interface to your Directus collection item vi
 
 - **Videos in Items**: Play videos on collection items detail page
 - **HLS Streaming**: Play HLS (m3u8) adaptive video streams
+- **File Module Integration**: Enable HLS streaming instead of progressive download on file detail page
 - **Standard Video Playback**: Support for MP4 and other standard video formats
 - **File Upload**: Uses Directus native drap & drop upload component for file relations
 - **Interface Options**:
@@ -68,8 +69,7 @@ When applied to a custom string field in the `directus_files` collection, this e
 
 1. Add a string field to `directus_files` (e.g., `stream_link`)
 2. Set the interface to **Streaming Video Player**
-3. Configure `stream link field name` in the interface options under **Streaming Configuration**
-4. In directus_files detail view: Enter stream link in the custom field and it will be picked up by the player
+3. In directus_files item view: Enter stream link in the custom field and it will be picked up by the player
 
 Use the toggle button to switch between HLS stream and source file playback.
 
