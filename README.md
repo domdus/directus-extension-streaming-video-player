@@ -2,7 +2,7 @@
 
 Play HLS adaptive video streams and standard video files directly in Directus with a customizable video player interface.
 
-<img width="511" height="309" alt="screenshot_player" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_player.png" />
+<img alt="screenshot_player" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_player.png" />
 
 ## Overview
 
@@ -101,7 +101,17 @@ When using the interface on file fields, you can configure:
 
 ## Screenshots
 
-_Screenshots will be added here showing the player in different contexts._
+<img alt="screenshot_files_1" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_files_1.png" />
+
+<img alt="screenshot_files_2" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_files_2.png" />
+
+<img alt="screenshot_files_detail_file" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_files_detail_file.png" />
+
+<img alt="screenshot_files_detail_hls" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_files_detail_hls.png" />
+
+<img alt="screenshot_stream_link" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_stream_link.png" />
+
+<img alt="screenshot_string" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_string.png" />
 
 ## Requirements
 
