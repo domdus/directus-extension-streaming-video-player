@@ -2,7 +2,7 @@
 
 Play HLS adaptive video streams and standard video files directly in Directus with a customizable video player interface.
 
-<img width="511" height="309" alt="image" src="https://github.com/domdus/directus-extension-streaming-video-player/blob/6527f8cfc16a894d5c74177e3f4c3310c4ff309a/docs/screenshot_player.png" />
+<img width="511" height="309" alt="image" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/refs/heads/main/docs/screenshot_player.png?token=GHSAT0AAAAAADPWYINHLAO5IKL2N4NPJLSK2JRKHUQ" />
 
 ## Overview
 
