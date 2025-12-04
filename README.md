@@ -6,7 +6,19 @@ Play HLS adaptive video streams and standard video files directly in Directus wi
 
 ## Overview
 
-This extension adds a video player interface to your Directus fields, allowing you to play adaptive HLS local or remote streams and standard video files (MP4, etc.) directly in the Data Studio. It works with both string fields (for stream links) and file fields (for uploaded videos).
+This extension adds a video player interface to your Directus collection item views, allowing you to play adaptive HLS local or remote streams (e.g., from Cloudflare Stream) and standard video files (MP4, etc.) directly in the Data Studio. It works with both string fields (for stream links) and Directus files (for uploaded videos).
+
+## Features
+
+- **Videos in Items**: Play videos on collection items detail page
+- **HLS Streaming**: Play HLS (m3u8) adaptive video streams
+- **Standard Video Playback**: Support for MP4 and other standard video formats
+- **File Upload**: Uses Directus native drap & drop upload component for file relations
+- **Interface Options**:
+  - Default upload folder & filter for files
+  - Directus options for input fields. 
+- **Poster Images**: Display poster images for video previews
+- **Native Player**: Full-featured HTML5 video player with controls, no fancy themes, small footprint
 
 ## Installation
 
@@ -37,27 +49,27 @@ Use this interface on string fields to play HLS stream links:
 1. Go to your collection settings
 2. Select a string field
 3. Set the interface to **Streaming Video Player**
-4. (In collection item field) Enter HLS stream paths for local origin resources (e.g., `/assets/:uid.m3u8`) or full URLs for remote/other resources (e.g., Cloudflare Stream)
+4. In collection item view: Enter HLS stream paths for local origin resources (e.g., `/assets/:uid`) or full URLs for remote/other resources (e.g., Cloudflare: https://customer-f33zs165nr7gyfy4.cloudflarestream.com/6b9e68b07dfee8cc2d116e4c51d6a957/manifest/video.m3u8)
 
-### For Files Relation (Video Files)
+### For Files Relation (Local Videos)
 
 Use this interface on relational file fields to play uploaded video files:
 
 1. Go to your collection settings
 2. Select a file field (UUID type)
 3. Set the interface to **Streaming Video Player**
-4. (In collection item) Upload or select video files
+4. In collection item view: Upload or select video file
 
 The player supports MP4 and other standard video formats.
 
 ### File Module Integration
 
-When applied to a string field in the `directus_files` collection, this extension will replace the default video player in the file detail page and prefere the HLS stream link:
+When applied to a custom string field in the `directus_files` collection, this extension will replace the default video player in the file detail page and prefere the HLS stream link:
 
 1. Add a string field to `directus_files` (e.g., `stream_link`)
 2. Set the interface to **Streaming Video Player**
-3. Configure the field name in the interface options under **Streaming Configuration**
-4. (In directus_files item) Enter stream link in the field and it will be picked up by the player
+3. Configure `stream link field name` in the interface options under **Streaming Configuration**
+4. In directus_files detail view: Enter stream link in the custom field and it will be picked up by the player
 
 Use the toggle button to switch between HLS stream and source file playback.
 
@@ -67,31 +79,25 @@ Use the toggle button to switch between HLS stream and source file playback.
 
 When using the interface on file fields, you can configure:
 
-- **Stream Link Field Name**: (File Fields Only) Name of the field in `directus_files` that contains the stream link. This enables the player to play the HLS stream on a collection item detail page, instead of playing the source file. If not configured, the player will use the uploaded source video file (no streaming).
+- **Stream Link Field Name**: (File field only) Name of a custom field in `directus_files` that contains the stream link. This enables the player to play the relational file HLS stream on a collection item detail page, instead of playing the source video file. (no streaming)
 - **Poster Image Field Name**: Name of the field that contains the poster/thumbnail image. Can be a file field (UUID) for uploaded images or a string field containing a full image URL. If not configured, defaults to `image`.
-- **Host URL**: Base URL for constructing stream URLs (supports `{{token}}` and `{{expires}}` placeholders for secure streams)
-- **Stream Secret**: Secret key for generating secure stream tokens (optional)
+- **Host URL**: Base URL for constructing stream URLs. Default is `localhost`. The host URL can combined with relative paths from collection items to create full stream URLs.
 
-### Input Field Options (String Fields Only)
+  **Examples:**
+  
+  1. Custom streaming server:
+     - Host URL: `https://stream.example.com`
+     - Item field value: `/stream/my_video.m3u8`
+     - Player plays: `https://stream.example.com/stream/my_video.m3u8`
+  
+  2. Cloudflare Stream:
+     - Host URL: `https://customer-f33zs165nr7gyfy4.cloudflarestream.com`
+     - Item field value: `/6b9e68b07dfee8cc2d116e4c51d6a957/manifest/video.m3u8`
+     - Player plays: `https://customer-f33zs165nr7gyfy4.cloudflarestream.com/6b9e68b07dfee8cc2d116e4c51d6a957/manifest/video.m3u8`
 
-When using the interface on string fields, all standard Directus input field options are available:
-- Placeholder text
-- Icons (left/right)
-- Font family
-- Soft length limit
-- Trim whitespace
-- Masked input
-- Clear button
-- Slugify
 
-## Features
+- **Stream Secret**: Secret key for generating tokens for protected stream link (optional)
 
-- **HLS Streaming**: Play HLS (m3u8) adaptive video streams
-- **Standard Video Playback**: Support for MP4 and other standard video formats
-- **Format Toggle**: Switch between HLS stream and source file playback (file module only)
-- **Secure Streams**: Optional token-based authentication for secure stream URLs
-- **Native Player**: Full-featured HTML5 video player with controls
-- **Poster Images**: Display poster images for video previews
 
 ## Screenshots
 
