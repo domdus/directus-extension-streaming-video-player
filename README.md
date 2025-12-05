@@ -81,7 +81,7 @@ Use the toggle button to switch between HLS stream and source file playback.
 
 ## Configuration
 
-- **Poster Image Field Name**: Name of the field that contains a poster/thumbnail image for player. It must be a file field (image) for uploaded images or a string field containing a full image URL. If not configured.
+- **Poster Image Field Name**: Name of the field that contains a poster/thumbnail image for player. It must be a file field (image) for uploaded images or a string field containing a full image URL.
 - **Stream Link Field Name**: (File field only) Name of a custom field in relational `directus_files` that contains the stream link. This enables the player to play the relational file HLS stream on a collection item detail page, instead of playing the source video file.
 
 ### Streaming Configuration 
