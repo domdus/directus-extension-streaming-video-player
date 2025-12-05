@@ -198,7 +198,42 @@ export default defineInterface({
 					options: {
 						placeholder: typeof window !== 'undefined' ? window.location.origin : ''
 					},
-					note: 'Optional: Set Host URL to combine with relative paths from collection field (e.g. domain + /path/to/video.m3u8). Leave empty when working with fully qualified URLs in collection field. Use mustache template syntax for secured links with {{token}} and {{expires}} placeholders (e.g., https://example.com/stream/hls/{{token}}/{{expires}}).'
+					note: `Host domain (e.g., https://example.com). Default: ${typeof window !== 'undefined' ? window.location.origin : ''}. Leave empty when working with fully qualified URLs in collection field.`
+				}
+			};
+
+			const urlSchemaOption = {
+				field: 'url_schema',
+				name: 'URL Schema',
+				type: 'string' as const,
+				meta: {
+					width: 'full' as const,
+					interface: 'input',
+					group: 'streaming_config',
+					options: {
+						placeholder: '{{host_url}}{{item_field}}'
+					},
+					note: 'Optional: URL template with mustache syntax placeholders: {{host_url}}, {{token}}, {{expires}}, {{item_field}}. Example: {{host_url}}/{{token}}/{{expires}}{{item_field}}',
+					conditions: [
+						{
+							name: 'Hide when stream_secret is empty',
+							rule: {
+								_or: [
+									{
+										stream_secret: {
+											_eq: null
+										}
+									},
+									{
+										stream_secret: {
+											_eq: ''
+										}
+									}
+								]
+							},
+							hidden: true
+						}
+					]
 				}
 			};
 			
@@ -214,7 +249,85 @@ export default defineInterface({
 						placeholder: 'Enter stream secret for HLS token generation',
 						secret: true
 					},
-					note: 'Secret key used for generating secure HLS stream tokens'
+					note: 'Secret key used for generating secure link tokens (MD5 hash)'
+				}
+			};
+
+			const includeIpOption = {
+				field: 'include_ip',
+				name: 'Include IP',
+				type: 'boolean' as const,
+				meta: {
+					width: 'full' as const,
+					interface: 'boolean',
+					group: 'streaming_config',
+					readonly: true,
+					options: {
+						label: 'Include client IP'
+					},
+					note: 'Include client IP address into secure token generation for client unique stream link protection',
+					conditions: [
+						{
+							name: 'Hide when stream_secret is empty',
+							rule: {
+								_or: [
+									{
+										stream_secret: {
+											_eq: null
+										}
+									},
+									{
+										stream_secret: {
+											_eq: ''
+										}
+									}
+								]
+							},
+							hidden: true
+						}
+					]
+				},
+				schema: {
+					default_value: false
+				}
+			};
+
+			const expiresInMinutesOption = {
+				field: 'expires_in_minutes',
+				name: 'Token Expiration (minutes)',
+				type: 'integer' as const,
+				meta: {
+					width: 'full' as const,
+					interface: 'input',
+					group: 'streaming_config',
+					options: {
+						placeholder: '60',
+						min: 1
+					},
+					note: 'Token expiration time in minutes (default: 60)',
+					conditions: [
+						{
+							name: 'Hide when stream_secret is empty',
+							rule: {
+								_or: [
+									{
+										stream_secret: {
+											_eq: null
+										}
+									},
+									{
+										stream_secret: {
+											_eq: ''
+										}
+									}
+								]
+							},
+							hidden: true
+						}
+					]
+				},
+				schema: {
+					default_value: 60
 				}
 			};
 
@@ -242,14 +355,14 @@ export default defineInterface({
 				meta: {
 					width: 'full' as const,
 					interface: 'input',
-					group: 'streaming_config',
+					// group: 'streaming_config',
 					options: {
 						placeholder: 'image'
 					},
-					note: 'Optional: Name of the field that contains the poster image. Can be a file field (UID) or string field (full URL)'
+					note: 'Optional: Name of the local field that contains the poster image. It must be a file (UUID) or string field (full URL).'
 				},
 				schema: {
-					default_value: 'image'
+					default_value: ''
 				}
 			};
 			
@@ -260,6 +373,9 @@ export default defineInterface({
 				hostUrlOption,
 				streamingConfigGroup,
 				streamSecretOption,
+				urlSchemaOption,
+				expiresInMinutesOption,
+				includeIpOption,
 				fieldOptionsGroup,
 				...fieldOptions
 			];
@@ -278,7 +394,42 @@ export default defineInterface({
 				options: {
 					placeholder: typeof window !== 'undefined' ? window.location.origin : ''
 				},
-				note: 'Optional: Set Host URL to combine with relative paths from collection field (e.g. domain + /path/to/video.m3u8). Leave empty when working with fully qualified URLs in collection field. Use mustache template syntax for secured links with {{token}} and {{expires}} placeholders (e.g., https://example.com/stream/hls/{{token}}/{{expires}}). '
+				note: `Host domain (e.g., https://example.com). Default: ${typeof window !== 'undefined' ? window.location.origin : ''}. Leave empty when working with fully qualified URLs in collection field.`
+			}
+		};
+
+		const urlSchemaOption = {
+			field: 'url_schema',
+			name: 'URL Schema',
+			type: 'string' as const,
+			meta: {
+				width: 'full' as const,
+				interface: 'input',
+				group: 'streaming_config',
+				options: {
+					placeholder: '{{host_url}}{{item_field}}'
+				},
+				note: 'Optional: URL template with mustache syntax placeholders: {{host_url}}, {{token}}, {{expires}}, {{item_field}}. Example: {{host_url}}/stream/{{token}}/{{expires}}{{item_field}}',
+				conditions: [
+					{
+						name: 'Hide when stream_secret is empty',
+						rule: {
+							_or: [
+								{
+									stream_secret: {
+										_eq: null
+									}
+								},
+								{
+									stream_secret: {
+										_eq: ''
+									}
+								}
+							]
+						},
+						hidden: true
+					}
+				]
 			}
 		};
 		
@@ -294,7 +445,27 @@ export default defineInterface({
 				special: ['alias', 'no-data', 'group'],
 				options: {
 					start: 'collapsed'
-				}
+				},
+				conditions: [
+					{
+						name: 'Hide when stream_link_field_name is empty',
+						rule: {
+							_or: [
+								{
+									stream_link_field_name: {
+										_eq: null
+									}
+								},
+								{
+									stream_link_field_name: {
+										_eq: ''
+									}
+								}
+							]
+						},
+						hidden: true
+					}
+				]
 			}
 		};
 		
@@ -310,7 +481,85 @@ export default defineInterface({
 					placeholder: 'Enter stream secret for HLS token generation',
 					secret: true
 				},
-				note: 'Secret key used for generating secure HLS stream tokens'
+				note: 'Secret key used for generating secure HLS stream tokens (MD5 hash)'
+			}
+		};
+
+		const includeIpOption = {
+			field: 'include_ip',
+			name: 'Include IP',
+			type: 'boolean' as const,
+			meta: {
+				width: 'full' as const,
+				interface: 'boolean',
+				group: 'streaming_config',
+				readonly: true,
+				options: {
+					label: 'Include client IP'
+				},
+				note: 'Include client IP address into secure token generation for client unique stream link protection',
+				conditions: [
+					{
+						name: 'Hide when stream_secret is empty',
+						rule: {
+							_or: [
+								{
+									stream_secret: {
+										_eq: null
+									}
+								},
+								{
+									stream_secret: {
+										_eq: ''
+									}
+								}
+							]
+						},
+						hidden: true
+					}
+				]
+			},
+			schema: {
+				default_value: false
+			}
+		};
+
+		const expiresInMinutesOption = {
+			field: 'expires_in_minutes',
+			name: 'Token Expiration (minutes)',
+			type: 'integer' as const,
+			meta: {
+				width: 'full' as const,
+				interface: 'input',
+				group: 'streaming_config',
+				options: {
+					placeholder: '60',
+					min: 1
+				},
+				note: 'Token expiration time in minutes (default: 60)',
+				conditions: [
+					{
+						name: 'Hide when stream_secret is empty',
+						rule: {
+							_or: [
+								{
+									stream_secret: {
+										_eq: null
+									}
+								},
+								{
+									stream_secret: {
+										_eq: ''
+									}
+								}
+							]
+						},
+						hidden: true
+					}
+				]
+			},
+			schema: {
+				default_value: 60
 			}
 		};
 		
@@ -321,11 +570,22 @@ export default defineInterface({
 			meta: {
 				width: 'full' as const,
 				interface: 'input',
-				group: 'streaming_config',
+				// group: 'streaming_config',
 				options: {
-					placeholder: 'Name of the field in directus_files collection'
+					placeholder: 'Field name in directus_files',
+					trim: true
 				},
-				note: 'When storing stream links in a directus_files field - set the name of it here'
+				note: 'Optional: Name of the field in the RELATED (m2o) directus_files collection',
+				validation: {
+					_and: [
+						{
+							stream_link_field_name: {
+								_regex: '^[^\\s]+$'
+							}
+						}
+					]
+				},
+				validation_message: 'Field name cannot contain spaces'
 			},
 			schema: {
 				default_value: ''
@@ -339,14 +599,14 @@ export default defineInterface({
 			meta: {
 				width: 'full' as const,
 				interface: 'input',
-				group: 'streaming_config',
+				//group: 'streaming_config',
 				options: {
 					placeholder: 'image'
 				},
-				note: 'Optional: Name of the field that contains the poster image. Can be a file field (UUID) or string field (full URL).'
+				note: 'Optional: Name of the local field that contains the poster image. It must be a file (UUID) or string field (full URL).'
 			},
 			schema: {
-				default_value: 'image'
+				default_value: ''
 			}
 		};
 		
@@ -387,10 +647,13 @@ export default defineInterface({
 		return [
 			infoNotice,
 			posterImageFieldNameOption,
+			streamLinkFieldNameOption,
 			hostUrlOption,
 			streamingConfigGroup,
 			streamSecretOption,
-			streamLinkFieldNameOption,
+			urlSchemaOption,
+			expiresInMinutesOption,
+			includeIpOption,
 			fieldOptionsGroup,
 			{
 				field: 'folder',

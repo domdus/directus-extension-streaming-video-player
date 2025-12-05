@@ -101,7 +101,9 @@ const props = withDefaults(
 		options?: {
 			stream_secret?: string;
 			host_url?: string;
+			url_schema?: string;
 			include_ip?: boolean;
+			expires_in_minutes?: number;
 			placeholder?: string;
 			iconLeft?: string;
 			iconRight?: string;
@@ -144,8 +146,10 @@ const { hlsInstance, playEventListener, setupHlsPlayer, cleanupHls } = useHlsPla
 const { getStreamUrl, apiBaseUrl } = useStreamUrl({
 	api,
 	hostUrl: attrs.host_url as string,
+	urlSchema: attrs.url_schema as string,
 	streamSecret: attrs.stream_secret as string,
-	includeIp: attrs.include_ip as boolean
+	includeIp: attrs.include_ip as boolean,
+	expiresInMinutes: attrs.expires_in_minutes as number
 });
 
 // Get stream link field name
