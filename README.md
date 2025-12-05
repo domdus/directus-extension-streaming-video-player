@@ -52,7 +52,7 @@ Use this interface on string fields to play HLS stream links:
 3. Set the interface to **Streaming Video Player**
 4. In collection item view: Enter HLS stream paths for local origin resources (e.g., `/assets/:UUID`) or full URLs for remote/other resources (e.g., Cloudflare: https://customer-f33zs165nr7gyfy4.cloudflarestream.com/6b9e68b07dfee8cc2d116e4c51d6a957/manifest/video.m3u8)
 
-<img alt="screenshot_stream_link" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_stream_link.png" />
+<img width="400px" alt="screenshot_stream_link" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_stream_link.png" />
 
 ### Directus Files (Local Videos)
 
@@ -76,7 +76,8 @@ You may want to keep your stream links next to your source Directus files (video
 Use the toggle button to switch between HLS stream and source file playback.
 
 
-<img alt="screenshot_files_detail_hls" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_files_detail_hls.png" /> <img alt="screenshot_files_detail_file" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_files_detail_file.png" />
+<img width="300px" alt="screenshot_files_detail_hls" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_files_detail_hls.png" />
+<img width="300px" alt="screenshot_files_detail_file" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_files_detail_file.png" />
 
 ## Configuration
 
@@ -111,7 +112,8 @@ Use the toggle button to switch between HLS stream and source file playback.
 
 ## Screenshots
 
-<img alt="screenshot_string" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_string.png" /> <img alt="screenshot_string" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_files_2.png" />
+<img width="300px" alt="screenshot_string" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_string.png" />
+<img width="300px"  alt="screenshot_string" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_files_2.png" />
 
 ## License
 
