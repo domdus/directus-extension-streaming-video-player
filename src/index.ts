@@ -572,8 +572,7 @@ export default defineInterface({
 				interface: 'input',
 				// group: 'streaming_config',
 				options: {
-					placeholder: 'Field name in directus_files',
-					trim: true
+					placeholder: 'Field name in directus_files'
 				},
 				note: 'Optional: Name of the field in the RELATED (m2o) directus_files collection',
 				validation: {
