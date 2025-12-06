@@ -2,7 +2,7 @@
 
 Play HLS and MPEG-DASH adaptive video streams and standard video files in Directus with a customizable video player interface.
 
-<img alt="screenshot_player" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_player.png" />
+<img alt="screenshot_player" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_player_updated.png" />
 
 ## Overview
 
