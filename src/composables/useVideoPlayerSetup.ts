@@ -3,11 +3,15 @@
  */
 import { ref, type Ref, computed } from 'vue';
 import type { useHlsPlayer } from './useHlsPlayer';
+import type { useDashPlayer } from './useDashPlayer';
+import { isDashStream } from './useDashPlayer';
 
 export function useVideoPlayerSetup(
 	videoElement: Ref<HTMLVideoElement | null>,
 	setupHlsPlayer: ReturnType<typeof useHlsPlayer>['setupHlsPlayer'],
 	cleanupHls: ReturnType<typeof useHlsPlayer>['cleanupHls'],
+	setupDashPlayer: ReturnType<typeof useDashPlayer>['setupDashPlayer'],
+	cleanupDash: ReturnType<typeof useDashPlayer>['cleanupDash'],
 	isStringField: Ref<boolean>,
 	shouldReplaceDefaultPlayer: Ref<boolean>,
 	streamUrlFromValue: Ref<string | null>,
@@ -19,7 +23,9 @@ export function useVideoPlayerSetup(
 	videoUrl: Ref<string | null>
 ) {
 	const videoPreload = computed(() => {
-		return useHls.value ? 'none' : 'metadata';
+		// For streaming formats (HLS/DASH), use 'none' to prevent preloading
+		// For regular MP4, use 'metadata' to load first frame
+		return (useHls.value || streamUrlFromValue.value) ? 'none' : 'metadata';
 	});
 
 	const setupVideoPlayer = () => {
@@ -32,16 +38,34 @@ export function useVideoPlayerSetup(
 		if (isStringField.value && !shouldReplaceDefaultPlayer.value) {
 			// String field but not replacing default player - setup our own player
 			cleanupHls();
+			cleanupDash();
 			
 			if (!videoElement.value) {
 				console.warn('[VideoPlayerSetup] Video element not available for string field setup');
 				return;
 			}
 			
-		if (useHls.value) {
-			// Use HLS
 			const streamUrl = streamUrlFromValue.value;
-			if (streamUrl) {
+			
+			// Check if it's a DASH stream
+			if (streamUrl && isDashStream(streamUrl)) {
+				setupDashPlayer(videoElement.value, streamUrl, () => {
+					// Fallback to MP4 if DASH fails
+					if (mp4Url.value) {
+						videoElement.value!.preload = 'metadata';
+						videoElement.value!.src = mp4Url.value;
+						videoElement.value!.load();
+					} else {
+						console.warn('[VideoPlayerSetup] No MP4 URL available for DASH fallback');
+					}
+				});
+				return;
+			}
+			
+			// Check if it's an HLS stream or useHls is enabled
+			if (useHls.value || (streamUrl && (streamUrl.endsWith('.m3u8') || streamUrl.includes('m3u8')))) {
+				// Use HLS
+				if (streamUrl) {
 					setupHlsPlayer(videoElement.value, streamUrl, () => {
 						// Fallback to MP4 if needed (though this shouldn't happen for string fields)
 						if (mp4Url.value) {
@@ -55,17 +79,18 @@ export function useVideoPlayerSetup(
 				} else {
 					console.warn('[VideoPlayerSetup] No stream URL available for string field HLS playback. Value:', streamUrlFromValue.value);
 				}
+				return;
+			}
+			
+			// Use MP4 (for string fields, this is unlikely but handle it)
+			if (mp4Url.value) {
+				// Set preload to metadata to load first frame - use both methods to ensure it works
+				videoElement.value.setAttribute('preload', 'metadata');
+				videoElement.value.preload = 'metadata';
+				videoElement.value.src = mp4Url.value;
+				videoElement.value.load();
 			} else {
-				// Use MP4 (for string fields, this is unlikely but handle it)
-				if (mp4Url.value) {
-					// Set preload to metadata to load first frame - use both methods to ensure it works
-					videoElement.value.setAttribute('preload', 'metadata');
-					videoElement.value.preload = 'metadata';
-					videoElement.value.src = mp4Url.value;
-					videoElement.value.load();
-				} else {
-					console.warn('[VideoPlayerSetup] No MP4 URL available for string field MP4 playback');
-				}
+				console.warn('[VideoPlayerSetup] No MP4 URL available for string field MP4 playback');
 			}
 			return;
 		}
@@ -77,13 +102,26 @@ export function useVideoPlayerSetup(
 		}
 		
 		cleanupHls();
+		cleanupDash();
 		
-		// If stream link field is configured and available, use HLS.js
+		// If stream link field is configured and available, check stream type
 		if (streamLinkFieldName.value) {
 			const streamLinkValue = fileData.value?.[streamLinkFieldName.value];
 			if (streamLinkValue) {
 				const streamUrl = getStreamUrl(streamLinkValue);
 				if (streamUrl) {
+					// Check if it's a DASH stream
+					if (isDashStream(streamUrl)) {
+						setupDashPlayer(videoElement.value, streamUrl, () => {
+							// Fallback to MP4 if DASH fails
+							if (videoUrl.value) {
+								videoElement.value!.src = videoUrl.value;
+							}
+						});
+						return;
+					}
+					
+					// Otherwise, assume HLS
 					setupHlsPlayer(videoElement.value, streamUrl, () => {
 						// Fallback to MP4 if HLS fails
 						if (videoUrl.value) {

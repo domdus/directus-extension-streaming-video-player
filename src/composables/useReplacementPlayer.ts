@@ -3,8 +3,10 @@
  */
 import { ref, type Ref } from 'vue';
 import Hls from 'hls.js';
+import * as dashjs from 'dashjs';
 import { getFileIdFromContext } from '../utils';
 import type { useApi } from '@directus/extensions-sdk';
+import { isDashStream } from './useDashPlayer';
 
 export function useReplacementPlayer(
 	props: any,
@@ -14,12 +16,28 @@ export function useReplacementPlayer(
 	streamUrlFromValue: Ref<string | null>,
 	useHls: Ref<boolean>,
 	setupHlsPlayer: (videoEl: HTMLVideoElement, streamUrl: string, fallback?: () => void) => void,
+	setupDashPlayer: (videoEl: HTMLVideoElement, streamUrl: string, fallback?: () => void) => void,
 	mp4Url: Ref<string | null>
 ) {
 	const replacementVideoElement = ref<HTMLVideoElement | null>(null);
 	const replacementHlsInstance = ref<any>(null);
+	const replacementDashInstance = ref<dashjs.MediaPlayerClass | null>(null);
+	const replacementQuality = ref<string | null>(null);
 	const currentFileId = ref<string | null>(null);
 	const currentFileType = ref<string | null>(null);
+
+	// Format quality height to display string
+	const formatQuality = (height: number | undefined): string | null => {
+		if (!height) return null;
+		if (height >= 2160) return '4K';
+		if (height >= 1440) return '1440p';
+		if (height >= 1080) return '1080p';
+		if (height >= 720) return '720p';
+		if (height >= 480) return '480p';
+		if (height >= 360) return '360p';
+		if (height >= 240) return '240p';
+		return `${height}p`;
+	};
 
 	// Load file data to get type/mimetype
 	const loadFileDataForReplacement = async (fileId: string) => {
@@ -43,15 +61,138 @@ export function useReplacementPlayer(
 			replacementHlsInstance.value = null;
 		}
 		
+		// Cleanup existing DASH instance
+		if (replacementDashInstance.value) {
+			try {
+				replacementDashInstance.value.reset();
+				replacementDashInstance.value.destroy();
+			} catch (error) {
+				console.warn('[ReplacementPlayer] Error cleaning up DASH:', error);
+			}
+			replacementDashInstance.value = null;
+		}
+		
+		// Reset quality
+		replacementQuality.value = null;
+		
 		// Clear video src
 		replacementVideoElement.value.src = '';
 		replacementVideoElement.value.removeAttribute('src');
 		
 		if (useHls.value) {
-			// Switch to HLS
+			// Switch to streaming format (HLS or DASH)
 			const streamUrl = streamUrlFromValue.value;
-			if (streamUrl) {
-				setupHlsPlayer(replacementVideoElement.value, streamUrl);
+			if (streamUrl && replacementVideoElement.value) {
+				const videoEl = replacementVideoElement.value;
+				
+				if (isDashStream(streamUrl)) {
+					// Create DASH instance with quality tracking
+					try {
+						const dashPlayer = dashjs.MediaPlayer().create();
+						dashPlayer.updateSettings({
+							streaming: {
+								buffer: {
+									bufferTimeAtTopQuality: 30,
+									bufferTimeAtTopQualityLongForm: 30,
+									longFormContentDurationThreshold: 600,
+									initialBufferLevel: 30,
+									fastSwitchEnabled: true
+								},
+								abr: {
+									useDefaultABRRules: true,
+									initialBitrate: { audio: -1, video: -1 }
+								}
+							}
+						});
+
+						const updateDashQuality = () => {
+							try {
+								const playerAny = dashPlayer as any;
+								const videoRepresentations = playerAny.getRepresentationsForType?.('video');
+								if (!videoRepresentations || videoRepresentations.length === 0) return;
+								const currentQualityIndex = playerAny.getQualityFor?.('video') ?? -1;
+								if (currentQualityIndex >= 0 && currentQualityIndex < videoRepresentations.length) {
+									replacementQuality.value = formatQuality(videoRepresentations[currentQualityIndex].height);
+								} else if (videoRepresentations.length > 0) {
+									const sortedReps = [...videoRepresentations].sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
+									replacementQuality.value = formatQuality(sortedReps[0].height);
+								}
+								updateReplacementPlayerInfo();
+							} catch (error) {
+								console.warn('[ReplacementPlayer] Error updating DASH quality:', error);
+							}
+						};
+
+						const Events = dashjs.MediaPlayer.events;
+						if (Events) {
+							if (Events.STREAM_INITIALIZED) {
+								dashPlayer.on(Events.STREAM_INITIALIZED, () => {
+									setTimeout(updateDashQuality, 200);
+								});
+							}
+							if (Events.QUALITY_CHANGE_RENDERED) {
+								dashPlayer.on(Events.QUALITY_CHANGE_RENDERED, updateDashQuality);
+							}
+						}
+
+						dashPlayer.initialize(videoEl, streamUrl, false);
+						replacementDashInstance.value = dashPlayer;
+						
+						videoEl.addEventListener('loadedmetadata', () => {
+							setTimeout(updateDashQuality, 300);
+						});
+						setTimeout(updateDashQuality, 1000);
+					} catch (error) {
+						console.error('[ReplacementPlayer] Error setting up DASH:', error);
+						setupDashPlayer(videoEl, streamUrl);
+					}
+				} else {
+					// Create HLS instance with quality tracking
+					if (Hls.isSupported()) {
+						const hls = new Hls({
+							enableWorker: true,
+							lowLatencyMode: true,
+							backBufferLength: 90,
+							autoStartLoad: true,
+							maxBufferLength: 3,
+							maxMaxBufferLength: 6,
+							maxBufferSize: 60 * 1000 * 1000
+						});
+						
+						hls.loadSource(streamUrl);
+						hls.attachMedia(videoEl);
+						replacementHlsInstance.value = hls;
+						
+						const updateHlsQuality = () => {
+							if (hls.levels && hls.levels.length > 0) {
+								const currentLevelIndex = hls.currentLevel;
+								if (currentLevelIndex >= 0 && currentLevelIndex < hls.levels.length) {
+									replacementQuality.value = formatQuality(hls.levels[currentLevelIndex].height);
+								} else if (hls.levels.length > 0) {
+									const sortedLevels = [...hls.levels].sort((a, b) => (b.height || 0) - (a.height || 0));
+									replacementQuality.value = formatQuality(sortedLevels[0].height);
+								}
+								updateReplacementPlayerInfo();
+							}
+						};
+
+						hls.on(Hls.Events.LEVEL_SWITCHED, updateHlsQuality);
+						hls.on(Hls.Events.LEVEL_LOADED, updateHlsQuality);
+						hls.on(Hls.Events.MANIFEST_PARSED, () => {
+							setTimeout(updateHlsQuality, 100);
+						});
+						
+						const onPlayHandler = () => {
+							if (hls) {
+								hls.startLoad();
+								videoEl.removeEventListener('play', onPlayHandler);
+							}
+						};
+						videoEl.addEventListener('play', onPlayHandler);
+					} else {
+						setupHlsPlayer(videoEl, streamUrl);
+					}
+				}
 			}
 		} else {
 			// Switch to File
@@ -77,10 +218,27 @@ export function useReplacementPlayer(
 		// Get filename from string field value (m3u8 path)
 		const filename = props.value && typeof props.value === 'string' ? props.value.split('/').pop() : '';
 		
+		const streamUrl = streamUrlFromValue.value;
+		const isDash = streamUrl ? isDashStream(streamUrl) : false;
+		// Always show stream label when we have a stream URL and useHls is true
+		const streamLabel = (useHls.value && streamUrl) ? (isDash ? 'DASH' : 'HLS') : '';
+		const qualityLabel = replacementQuality.value || '';
+		
+		// Build the content
+		const contentParts = [];
+		if (filename) {
+			contentParts.push(`<span style="font-weight: 500;">${filename}</span>`);
+		}
+		if (streamLabel) {
+			contentParts.push(`<span class="${isDash ? 'dash' : 'hls'}-label" style="background: var(--theme--primary, #6644ff); color: var(--white, #fff); padding: 2px 6px; border-radius: 4px; font-weight: 500; font-size: 11px;">${streamLabel}</span>`);
+		}
+		if (qualityLabel) {
+			contentParts.push(`<span class="quality-label" style="background: var(--theme--primary, #6644ff); color: var(--white, #fff); padding: 2px 6px; border-radius: 4px; font-weight: 500; font-size: 11px;">${qualityLabel}</span>`);
+		}
+		
 		infoOverlay.innerHTML = `
 			<div style="color: var(--theme--foreground-inverse-subdued, rgba(255, 255, 255, 0.7)); font-size: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-				${filename ? `<span style="font-weight: 500;">${filename}</span>` : ''}
-				${useHls.value ? '<span class="hls-label" style="background: var(--theme--primary, #6644ff); color: var(--white, #fff); padding: 2px 6px; border-radius: 4px; font-weight: 500; font-size: 11px;">HLS</span>' : ''}
+				${contentParts.join('')}
 			</div>
 		`;
 	};
@@ -139,7 +297,7 @@ export function useReplacementPlayer(
 			// Update existing button text
 			const existingButton = existingContainer.querySelector('.format-toggle') as HTMLButtonElement;
 			if (existingButton) {
-				existingButton.textContent = useHls.value ? 'Switch to File' : 'Switch to HLS';
+				existingButton.textContent = useHls.value ? 'Switch to File' : 'Switch to Stream';
 			}
 			return;
 		}
@@ -151,14 +309,14 @@ export function useReplacementPlayer(
 		
 		const toggleButton = document.createElement('button');
 		toggleButton.className = 'format-toggle';
-		toggleButton.textContent = useHls.value ? 'Switch to File' : 'Switch to HLS';
+		toggleButton.textContent = useHls.value ? 'Switch to File' : 'Switch to Stream';
 		toggleButton.style.cssText = 'color: var(--theme--primary); cursor: pointer; font-weight: 600; background: none; border: none; padding: 0;';
 		
 		// Create click handler that updates button text
 		const clickHandler = () => {
 			togglePlaybackFormat();
 			// Update button text after toggle
-			toggleButton.textContent = useHls.value ? 'Switch to File' : 'Switch to HLS';
+			toggleButton.textContent = useHls.value ? 'Switch to File' : 'Switch to Stream';
 		};
 		
 		toggleButton.addEventListener('click', clickHandler);
@@ -260,8 +418,101 @@ export function useReplacementPlayer(
 				void videoEl.offsetWidth;
 			};
 			
-			// For HLS.js, create a custom HLS instance to track level changes
-			if (Hls.isSupported()) {
+			// Check if it's a DASH stream
+			if (isDashStream(streamUrl)) {
+				// Create DASH instance for replacement player to track quality
+				try {
+					const dashPlayer = dashjs.MediaPlayer().create();
+					
+					// Configure player settings
+					dashPlayer.updateSettings({
+						streaming: {
+							buffer: {
+								bufferTimeAtTopQuality: 30,
+								bufferTimeAtTopQualityLongForm: 30,
+								longFormContentDurationThreshold: 600,
+								initialBufferLevel: 30,
+								fastSwitchEnabled: true
+							},
+							abr: {
+								useDefaultABRRules: true,
+								initialBitrate: {
+									audio: -1,
+									video: -1
+								}
+							}
+						}
+					});
+
+					// Helper to update quality for replacement DASH player
+					const updateReplacementDashQuality = () => {
+						try {
+							const playerAny = dashPlayer as any;
+							const videoRepresentations = playerAny.getRepresentationsForType?.('video');
+							if (!videoRepresentations || videoRepresentations.length === 0) return;
+
+							const currentQualityIndex = playerAny.getQualityFor?.('video') ?? -1;
+							
+							if (currentQualityIndex >= 0 && currentQualityIndex < videoRepresentations.length) {
+								const currentRep = videoRepresentations[currentQualityIndex];
+								replacementQuality.value = formatQuality(currentRep.height);
+							} else if (videoRepresentations.length > 0) {
+								const sortedReps = [...videoRepresentations].sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
+								replacementQuality.value = formatQuality(sortedReps[0].height);
+							}
+							updateReplacementPlayerInfo();
+						} catch (error) {
+							console.warn('[ReplacementPlayer] Error updating DASH quality:', error);
+						}
+					};
+
+					// Set up event listeners for quality tracking
+					const Events = dashjs.MediaPlayer.events;
+					if (Events) {
+						if (Events.STREAM_INITIALIZED) {
+							dashPlayer.on(Events.STREAM_INITIALIZED, () => {
+								setTimeout(() => {
+									updateReplacementDashQuality();
+								}, 200);
+							});
+						}
+						if (Events.QUALITY_CHANGE_RENDERED) {
+							dashPlayer.on(Events.QUALITY_CHANGE_RENDERED, () => {
+								updateReplacementDashQuality();
+							});
+						}
+					}
+
+					// Initialize player
+					dashPlayer.initialize(videoEl, streamUrl, false);
+					
+					// Store instance
+					replacementDashInstance.value = dashPlayer;
+					
+					// Listen for video events to update quality
+					videoEl.addEventListener('loadedmetadata', () => {
+						setTimeout(() => {
+							updateReplacementDashQuality();
+						}, 300);
+					});
+					
+					videoEl.addEventListener('playing', () => {
+						setTimeout(() => {
+							updateReplacementDashQuality();
+						}, 500);
+					});
+					
+					// Initial quality check
+					setTimeout(() => {
+						updateReplacementDashQuality();
+					}, 1000);
+				} catch (error) {
+					console.error('[ReplacementPlayer] Error setting up DASH:', error);
+					// Fallback to setupDashPlayer
+					setupDashPlayer(videoEl, streamUrl);
+				}
+			} else if (Hls.isSupported()) {
+				// For HLS.js, create a custom HLS instance to track level changes
 				// Create HLS instance specifically for replacement player to track events
 				const hls = new Hls({
 					enableWorker: true,
@@ -279,21 +530,41 @@ export function useReplacementPlayer(
 				// Store HLS instance for cleanup
 				replacementHlsInstance.value = hls;
 				
+				// Helper to update quality for replacement player
+				const updateReplacementQuality = () => {
+					if (hls.levels && hls.levels.length > 0) {
+						const currentLevelIndex = hls.currentLevel;
+						if (currentLevelIndex >= 0 && currentLevelIndex < hls.levels.length) {
+							const level = hls.levels[currentLevelIndex];
+							replacementQuality.value = formatQuality(level.height);
+						} else if (hls.levels.length > 0) {
+							const sortedLevels = [...hls.levels].sort((a, b) => (b.height || 0) - (a.height || 0));
+							replacementQuality.value = formatQuality(sortedLevels[0].height);
+						}
+						updateReplacementPlayerInfo();
+					}
+				};
+
 				// Listen for level changes (quality switches) - this is the key fix
 				hls.on(Hls.Events.LEVEL_SWITCHED, () => {
 					ensureFullWidth();
+					updateReplacementQuality();
 					// Also trigger after a delay to ensure layout has updated
 					setTimeout(ensureFullWidth, 50);
 				});
 				
 				hls.on(Hls.Events.LEVEL_LOADED, () => {
 					ensureFullWidth();
+					updateReplacementQuality();
 				});
 				
 				// Listen for manifest parsed to ensure initial sizing
 				hls.on(Hls.Events.MANIFEST_PARSED, () => {
 					ensureFullWidth();
-					setTimeout(ensureFullWidth, 100);
+					setTimeout(() => {
+						ensureFullWidth();
+						updateReplacementQuality();
+					}, 100);
 				});
 				
 				// Add play event listener
@@ -334,6 +605,11 @@ export function useReplacementPlayer(
 			// Add info overlay
 			addInfoOverlayToReplacementPlayer(filePreviewContainer);
 			
+			// Update info overlay after a short delay to ensure player is initialized
+			setTimeout(() => {
+				updateReplacementPlayerInfo();
+			}, 500);
+			
 			// Add toggle button below the player
 			addToggleButtonToFilePreview(filePreviewContainer, () => {
 				useHls.value = !useHls.value;
@@ -341,7 +617,7 @@ export function useReplacementPlayer(
 				// Update toggle button text in file preview
 				const toggleButton = filePreviewContainer.querySelector('.format-toggle') as HTMLButtonElement;
 				if (toggleButton) {
-					toggleButton.textContent = useHls.value ? 'Switch to File' : 'Switch to HLS';
+					toggleButton.textContent = useHls.value ? 'Switch to File' : 'Switch to Stream';
 				}
 			});
 		}, 100);
@@ -353,10 +629,22 @@ export function useReplacementPlayer(
 			replacementHlsInstance.value.destroy();
 			replacementHlsInstance.value = null;
 		}
+		if (replacementDashInstance.value) {
+			try {
+				replacementDashInstance.value.reset();
+				replacementDashInstance.value.destroy();
+			} catch (error) {
+				console.warn('[ReplacementPlayer] Error cleaning up DASH:', error);
+			}
+			replacementDashInstance.value = null;
+		}
 		if (replacementVideoElement.value) {
 			replacementVideoElement.value.dataset.replacedByHls = 'false';
 			replacementVideoElement.value = null;
 		}
+		
+		// Reset quality
+		replacementQuality.value = null;
 	};
 
 	const togglePlaybackFormat = (videoElement: Ref<HTMLVideoElement | null>, setupVideoPlayer: () => void) => {
@@ -370,7 +658,7 @@ export function useReplacementPlayer(
 			if (filePreviewContainer) {
 				const toggleButton = filePreviewContainer.querySelector('.format-toggle') as HTMLButtonElement;
 				if (toggleButton) {
-					toggleButton.textContent = useHls.value ? 'Switch to File' : 'Switch to HLS';
+					toggleButton.textContent = useHls.value ? 'Switch to File' : 'Switch to Stream';
 				}
 			}
 		} else if (videoElement.value) {

@@ -40,7 +40,16 @@
 				<div class="shadow"></div>
 				<div class="actions">
 					<v-button
-						v-tooltip="'Zoom in'"
+						v-tooltip="isPlaying ? 'Pause' : 'Play'"
+						rounded
+						icon
+						secondary
+						@click="togglePlayPause"
+					>
+						<v-icon :name="isPlaying ? 'pause' : 'play_arrow'" />
+					</v-button>
+					<v-button
+						v-tooltip="'Fullscreen'"
 						rounded
 						icon
 						secondary
@@ -70,8 +79,14 @@
 				<div v-if="value" class="info">
 					<div class="title">{{ value.split('/').pop() }}</div>
 					<div class="meta">
-						<span v-if="useHls" class="hls-label">
+						<span v-if="isDash" class="dash-label">
+							DASH
+						</span>
+						<span v-else-if="useHls" class="hls-label">
 							HLS
+						</span>
+						<span v-if="(isDash || useHls) && currentQuality" class="quality-label">
+							{{ currentQuality }}
 						</span>
 					</div>
 				</div>
@@ -82,7 +97,7 @@
 					class="format-toggle"
 					@click="$emit('toggle-format')"
 				>
-					{{ useHls ? 'Switch to MP4' : 'Switch to HLS' }}
+					{{ useHls ? 'Switch to Source File' : 'Switch to Stream' }}
 				</button>
 			</div>
 		</div>
@@ -90,8 +105,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import type { InputOptions } from '../composables/useInputOptions';
+import { isDashStream } from '../composables/useDashPlayer';
 
 interface Props {
 	value: string | null;
@@ -102,13 +118,14 @@ interface Props {
 	streamUrlFromValue: string | null;
 	videoPreload: string;
 	useHls: boolean;
+	currentQuality?: string | null;
 	disabled?: boolean;
 	inputOptions: InputOptions;
 	inputPlaceholder: string;
 	processedValue: string | null;
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
 
 defineEmits<{
 	'update:value': [value: string | null];
@@ -122,11 +139,69 @@ defineEmits<{
 }>();
 
 const videoElementRef = ref<HTMLVideoElement | null>(null);
+const isPlaying = ref(false);
+
+const togglePlayPause = () => {
+	if (!videoElementRef.value) return;
+	
+	if (videoElementRef.value.paused) {
+		videoElementRef.value.play();
+		isPlaying.value = true;
+	} else {
+		videoElementRef.value.pause();
+		isPlaying.value = false;
+	}
+};
+
+const updatePlayState = () => {
+	if (videoElementRef.value) {
+		isPlaying.value = !videoElementRef.value.paused;
+	}
+};
+
+const setupEventListeners = () => {
+	if (videoElementRef.value) {
+		videoElementRef.value.addEventListener('play', updatePlayState);
+		videoElementRef.value.addEventListener('pause', updatePlayState);
+		videoElementRef.value.addEventListener('ended', () => {
+			isPlaying.value = false;
+		});
+		// Initialize state
+		updatePlayState();
+	}
+};
+
+const removeEventListeners = () => {
+	if (videoElementRef.value) {
+		videoElementRef.value.removeEventListener('play', updatePlayState);
+		videoElementRef.value.removeEventListener('pause', updatePlayState);
+		videoElementRef.value.removeEventListener('ended', () => {
+			isPlaying.value = false;
+		});
+	}
+};
+
+// Detect if stream is DASH
+const isDash = computed(() => {
+	return props.streamUrlFromValue ? isDashStream(props.streamUrlFromValue) : false;
+});
 
 // Watch for when video element becomes available and expose it
-watch(videoElementRef, () => {
-	// Video element ref is available
+watch(videoElementRef, (newVal) => {
+	if (newVal) {
+		setupEventListeners();
+	}
 }, { immediate: true });
+
+onMounted(() => {
+	nextTick(() => {
+		setupEventListeners();
+	});
+});
+
+onUnmounted(() => {
+	removeEventListeners();
+});
 
 defineExpose({
 	videoElement: videoElementRef
@@ -258,7 +333,18 @@ defineExpose({
 	flex-wrap: wrap;
 }
 
-.info .meta .hls-label {
+.info .meta .hls-label,
+.info .meta .dash-label {
+	background: var(--theme--primary, #6644ff);
+	color: var(--white, #fff);
+	margin-top: 4px;
+	padding: 2px 6px;
+	border-radius: 4px;
+	font-weight: 500;
+	font-size: 11px;
+}
+
+.info .meta .quality-label {
 	background: var(--theme--primary, #6644ff);
 	color: var(--white, #fff);
 	margin-top: 4px;

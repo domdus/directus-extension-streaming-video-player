@@ -28,7 +28,16 @@
 				<div class="shadow"></div>
 				<div class="actions">
 					<v-button
-						v-tooltip="'Zoom in'"
+						v-tooltip="isPlaying ? 'Pause' : 'Play'"
+						rounded
+						icon
+						secondary
+						@click="togglePlayPause"
+					>
+						<v-icon :name="isPlaying ? 'pause' : 'play_arrow'" />
+					</v-button>
+					<v-button
+						v-tooltip="'Fullscreen'"
 						rounded
 						icon
 						secondary
@@ -84,8 +93,14 @@
 						</span>
 					</div>
 					<div class="meta" v-if="fileData && streamLinkFieldName && fileData[streamLinkFieldName]">
-						<span class="hls-label">
+						<span v-if="isDash" class="dash-label">
+							DASH
+						</span>
+						<span v-else class="hls-label">
 							HLS
+						</span>
+						<span v-if="currentQuality" class="quality-label">
+							{{ currentQuality }}
 						</span>
 					</div>
 				</div>
@@ -95,9 +110,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { formatFileSize } from '../utils';
 import type { FileData } from '../composables/useFileData';
+import { isDashStream } from '../composables/useDashPlayer';
 
 interface Props {
 	value: string | null;
@@ -108,6 +124,7 @@ interface Props {
 	posterUrl: string | null;
 	downloadUrl: string | null;
 	streamLinkFieldName: string;
+	currentQuality?: string | null;
 	createAllowed: boolean;
 	enableCreateValue: boolean;
 	enableSelectValue: boolean;
@@ -115,7 +132,7 @@ interface Props {
 	customFilter: any;
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
 
 defineEmits<{
 	upload: [fileInfo: any];
@@ -124,13 +141,75 @@ defineEmits<{
 	edit: [];
 	clear: [];
 }>();
-
 const videoElementRef = ref<HTMLVideoElement | null>(null);
+const isPlaying = ref(false);
+
+const togglePlayPause = () => {
+	if (!videoElementRef.value) return;
+	
+	if (videoElementRef.value.paused) {
+		videoElementRef.value.play();
+		isPlaying.value = true;
+	} else {
+		videoElementRef.value.pause();
+		isPlaying.value = false;
+	}
+};
+
+const updatePlayState = () => {
+	if (videoElementRef.value) {
+		isPlaying.value = !videoElementRef.value.paused;
+	}
+};
+
+const setupEventListeners = () => {
+	if (videoElementRef.value) {
+		videoElementRef.value.addEventListener('play', updatePlayState);
+		videoElementRef.value.addEventListener('pause', updatePlayState);
+		videoElementRef.value.addEventListener('ended', () => {
+			isPlaying.value = false;
+		});
+		// Initialize state
+		updatePlayState();
+	}
+};
+
+const removeEventListeners = () => {
+	if (videoElementRef.value) {
+		videoElementRef.value.removeEventListener('play', updatePlayState);
+		videoElementRef.value.removeEventListener('pause', updatePlayState);
+		videoElementRef.value.removeEventListener('ended', () => {
+			isPlaying.value = false;
+		});
+	}
+};
+
+// Detect if stream is DASH
+const isDash = computed(() => {
+	if (!props.fileData || !props.streamLinkFieldName) return false;
+	const streamLinkValue = props.fileData[props.streamLinkFieldName];
+	if (typeof streamLinkValue === 'string') {
+		return isDashStream(streamLinkValue);
+	}
+	return false;
+});
 
 // Watch for when video element becomes available and expose it
-watch(videoElementRef, () => {
-	// Video element ref is available
+watch(videoElementRef, (newVal) => {
+	if (newVal) {
+		setupEventListeners();
+	}
 }, { immediate: true });
+
+onMounted(() => {
+	nextTick(() => {
+		setupEventListeners();
+	});
+});
+
+onUnmounted(() => {
+	removeEventListeners();
+});
 
 defineExpose({
 	videoElement: videoElementRef
@@ -234,7 +313,18 @@ defineExpose({
 	flex-wrap: wrap;
 }
 
-.info .meta .hls-label {
+.info .meta .hls-label,
+.info .meta .dash-label {
+	background: var(--theme--primary, #6644ff);
+	color: var(--white, #fff);
+	margin-top: 4px;
+	padding: 2px 6px;
+	border-radius: 4px;
+	font-weight: 500;
+	font-size: 11px;
+}
+
+.info .meta .quality-label {
 	background: var(--theme--primary, #6644ff);
 	color: var(--white, #fff);
 	margin-top: 4px;

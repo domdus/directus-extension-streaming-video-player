@@ -5,7 +5,7 @@ export default defineInterface({
 	id: 'interface-video-player',
 	name: 'Streaming Video Player',
 	icon: 'play_circle',
-	description: 'Play HLS (m3u8) video streams and standard video files (mp4, etc.) with this enhanced video player interface',
+	description: 'Play HLS and MPEG-DASH adaptive video streams and standard video files (mp4, etc.) with this enhanced video player interface',
 	component: InterfaceComponent,
 	types: ['uuid', 'string'],
 	localTypes: ['file', 'standard'],

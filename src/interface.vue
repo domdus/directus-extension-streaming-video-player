@@ -12,6 +12,7 @@
 			:stream-url-from-value="streamUrlFromValue"
 			:video-preload="videoPreload"
 			:use-hls="useHls"
+			:current-quality="currentQuality"
 			:disabled="disabled"
 			:input-options="inputOptions"
 			:input-placeholder="inputPlaceholder"
@@ -38,6 +39,7 @@
 			:poster-url="posterUrl"
 			:download-url="downloadUrl"
 			:stream-link-field-name="streamLinkFieldName"
+			:current-quality="currentQuality"
 			:create-allowed="createAllowed"
 			:enable-create-value="enableCreateValue"
 			:enable-select-value="enableSelectValue"
@@ -67,6 +69,7 @@ import { ref, computed, watch, onMounted, onUnmounted, nextTick, useAttrs, injec
 import { useApi } from '@directus/extensions-sdk';
 import { useStreamUrl } from './composables/useStreamUrl';
 import { useHlsPlayer } from './composables/useHlsPlayer';
+import { useDashPlayer } from './composables/useDashPlayer';
 import { useInputOptions } from './composables/useInputOptions';
 import { useFileData } from './composables/useFileData';
 import { useFieldDetection } from './composables/useFieldDetection';
@@ -142,7 +145,8 @@ let srcCheckTimeout: ReturnType<typeof setTimeout> | null = null;
 // Composables
 const { fileData, loading, loadFileData, clearFileData } = useFileData();
 const { inputOptions, inputPlaceholder, processValue } = useInputOptions(attrs);
-const { hlsInstance, playEventListener, setupHlsPlayer, cleanupHls } = useHlsPlayer(videoElement);
+const { hlsInstance, playEventListener, currentQuality: hlsQuality, setupHlsPlayer, cleanupHls } = useHlsPlayer(videoElement);
+const { dashInstance, currentQuality: dashQuality, setupDashPlayer, cleanupDash } = useDashPlayer(videoElement);
 const { getStreamUrl, apiBaseUrl } = useStreamUrl({
 	api,
 	hostUrl: attrs.host_url as string,
@@ -150,6 +154,11 @@ const { getStreamUrl, apiBaseUrl } = useStreamUrl({
 	streamSecret: attrs.stream_secret as string,
 	includeIp: attrs.include_ip as boolean,
 	expiresInMinutes: attrs.expires_in_minutes as number
+});
+
+// Combine quality from both HLS and DASH players
+const currentQuality = computed(() => {
+	return hlsQuality.value || dashQuality.value || null;
 });
 
 // Get stream link field name
@@ -212,6 +221,7 @@ const {
 	streamUrlFromValue,
 	useHls,
 	setupHlsPlayer,
+	setupDashPlayer,
 	mp4UrlComputed
 );
 
@@ -225,6 +235,8 @@ const {
 	videoElement,
 	setupHlsPlayer,
 	cleanupHls,
+	setupDashPlayer,
+	cleanupDash,
 	isStringField,
 	shouldReplaceDefaultPlayer,
 	streamUrlFromValue,
@@ -531,6 +543,7 @@ const updateValue = (newValue: string | null) => {
 	} else {
 		clearFileData();
 		cleanupHls();
+		cleanupDash();
 	}
 };
 
@@ -598,6 +611,7 @@ watch(() => props.value, (newValue) => {
 				});
 			} else {
 				cleanupHls();
+				cleanupDash();
 			}
 		}
 	} else {
@@ -631,6 +645,7 @@ watch(() => props.value, (newValue) => {
 		} else {
 			fileData.value = null;
 			cleanupHls();
+			cleanupDash();
 		}
 	}
 }, { immediate: true });
@@ -678,6 +693,7 @@ onMounted(() => {
 
 onUnmounted(() => {
 	cleanupHls();
+	cleanupDash();
 	cleanupReplacementPlayer();
 	if (srcCheckTimeout) {
 		clearTimeout(srcCheckTimeout);

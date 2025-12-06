@@ -14,7 +14,16 @@
 			<div class="shadow"></div>
 			<div class="actions">
 				<v-button
-					v-tooltip="'Zoom in'"
+					v-tooltip="isPlaying ? 'Pause' : 'Play'"
+					rounded
+					icon
+					secondary
+					@click="togglePlayPause"
+				>
+					<v-icon :name="isPlaying ? 'pause' : 'play_arrow'" />
+				</v-button>
+				<v-button
+					v-tooltip="'Fullscreen'"
 					rounded
 					icon
 					secondary
@@ -59,6 +68,7 @@
 				<div class="meta">
 					<slot name="meta">
 						<span v-if="showHlsLabel" class="hls-label">HLS</span>
+						<span v-if="showHlsLabel && currentQuality" class="quality-label">{{ currentQuality }}</span>
 					</slot>
 				</div>
 			</div>
@@ -68,7 +78,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue';
 
 interface Props {
 	showPlayer: boolean;
@@ -80,6 +90,7 @@ interface Props {
 	showInfo?: boolean;
 	title?: string;
 	showHlsLabel?: boolean;
+	currentQuality?: string | null;
 	downloadUrl?: string;
 	downloadFilename?: string;
 }
@@ -93,8 +104,68 @@ defineEmits<{
 	clear: [];
 }>();
 
-const videoElement = defineExpose({
-	videoElement: ref<HTMLVideoElement | null>(null)
+const videoElement = ref<HTMLVideoElement | null>(null);
+const isPlaying = ref(false);
+
+const togglePlayPause = () => {
+	if (!videoElement.value) return;
+	
+	if (videoElement.value.paused) {
+		videoElement.value.play();
+		isPlaying.value = true;
+	} else {
+		videoElement.value.pause();
+		isPlaying.value = false;
+	}
+};
+
+const updatePlayState = () => {
+	if (videoElement.value) {
+		isPlaying.value = !videoElement.value.paused;
+	}
+};
+
+const setupEventListeners = () => {
+	if (videoElement.value) {
+		videoElement.value.addEventListener('play', updatePlayState);
+		videoElement.value.addEventListener('pause', updatePlayState);
+		videoElement.value.addEventListener('ended', () => {
+			isPlaying.value = false;
+		});
+		// Initialize state
+		updatePlayState();
+	}
+};
+
+const removeEventListeners = () => {
+	if (videoElement.value) {
+		videoElement.value.removeEventListener('play', updatePlayState);
+		videoElement.value.removeEventListener('pause', updatePlayState);
+		videoElement.value.removeEventListener('ended', () => {
+			isPlaying.value = false;
+		});
+	}
+};
+
+// Watch for video element to be available
+watch(videoElement, (newVal) => {
+	if (newVal) {
+		setupEventListeners();
+	}
+}, { immediate: true });
+
+onMounted(() => {
+	nextTick(() => {
+		setupEventListeners();
+	});
+});
+
+onUnmounted(() => {
+	removeEventListeners();
+});
+
+defineExpose({
+	videoElement
 });
 </script>
 
@@ -192,6 +263,16 @@ const videoElement = defineExpose({
 }
 
 .info .meta .hls-label {
+	background: var(--theme--primary, #6644ff);
+	color: var(--white, #fff);
+	margin-top: 4px;
+	padding: 2px 6px;
+	border-radius: 4px;
+	font-weight: 500;
+	font-size: 11px;
+}
+
+.info .meta .quality-label {
 	background: var(--theme--primary, #6644ff);
 	color: var(--white, #fff);
 	margin-top: 4px;
