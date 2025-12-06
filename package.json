@@ -20,6 +20,14 @@
 		"source": "src/index.ts",
 		"host": "^11.0.0"
 	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/domdus/directus-extension-streaming-video-player.git"
+	},
+	"bugs": {
+		"url": "https://github.com/domdus/directus-extension-streaming-video-player/issues"
+	},
+	"homepage": "https://github.com/domdus/directus-extension-streaming-video-player#readme",
 	"scripts": {
 		"build": "directus-extension build",
 		"dev": "directus-extension build -w --no-minify",
