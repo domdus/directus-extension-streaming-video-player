@@ -564,12 +564,19 @@ const openEditDialog = () => {
 	editDrawerRef.value.editDrawerActive = true;
 };
 
-const update = (value: string | Record<string, any> | null) => {
+const update = async (value: string | Record<string, any> | null) => {
 	if (typeof value === 'string') {
 		updateValue(value);
 	} else if (value && typeof value === 'object' && value.id) {
-		updateValue(value.id);
-			} else {
+		// When drawer saves, update local fileData immediately with the updated data
+		// This ensures the UI reflects changes immediately
+		if (fileData.value && fileData.value.id === value.id) {
+			// Merge the updated data into existing fileData
+			fileData.value = { ...fileData.value, ...value };
+		}
+		// Also reload to ensure everything is in sync
+		await loadFileDataAndSetup(value.id);
+	} else {
 		updateValue(null);
 	}
 };
