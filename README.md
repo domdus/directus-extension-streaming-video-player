@@ -79,8 +79,10 @@ You may want to keep your stream links next to your source Directus files (video
 Use the toggle button to switch between stream (HLS/DASH) and source file playback.
 
 
-<img width="300px" alt="screenshot_files_detail_hls" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_files_detail_hls.png" />
-<img width="300px" alt="screenshot_files_detail_file" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_files_detail_file.png" />
+<div style="display: flex; gap: 10px;">
+  <img width="300px" alt="screenshot_files_detail_hls" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_files_detail_hls.png" />
+  <img width="300px" alt="screenshot_files_detail_file" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_files_detail_file.png" />
+</div>
 
 ## Configuration
 
