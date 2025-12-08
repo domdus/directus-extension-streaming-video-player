@@ -4,7 +4,7 @@
 import { ref, type Ref } from 'vue';
 import Hls from 'hls.js';
 import * as dashjs from 'dashjs';
-import { getFileIdFromContext } from '../utils';
+import { getFileIdFromContext, formatFileSize } from '../utils';
 import type { useApi } from '@directus/extensions-sdk';
 import { isDashStream } from './useDashPlayer';
 
@@ -25,6 +25,7 @@ export function useReplacementPlayer(
 	const replacementQuality = ref<string | null>(null);
 	const currentFileId = ref<string | null>(null);
 	const currentFileType = ref<string | null>(null);
+	const currentFileData = ref<any>(null);
 
 	// Format quality height to display string
 	const formatQuality = (height: number | undefined): string | null => {
@@ -39,15 +40,17 @@ export function useReplacementPlayer(
 		return `${height}p`;
 	};
 
-	// Load file data to get type/mimetype
+	// Load file data to get type/mimetype and other file info
 	const loadFileDataForReplacement = async (fileId: string) => {
 		try {
 			const response = await api.get(`/files/${fileId}`);
 			const file = response.data.data;
+			currentFileData.value = file;
 			currentFileType.value = file.type || 'video/mp4';
 		} catch (error) {
 			console.error('Failed to load file data for replacement player:', error);
 			currentFileType.value = 'video/mp4'; // Default fallback
+			currentFileData.value = null;
 		}
 	};
 
@@ -215,30 +218,48 @@ export function useReplacementPlayer(
 		const infoOverlay = container.querySelector('.replacement-player-info');
 		if (!infoOverlay) return;
 		
-		// Get filename from string field value (m3u8 path)
-		const filename = props.value && typeof props.value === 'string' ? props.value.split('/').pop() : '';
-		
+		const fileData = currentFileData.value;
 		const streamUrl = streamUrlFromValue.value;
 		const isDash = streamUrl ? isDashStream(streamUrl) : false;
-		// Always show stream label when we have a stream URL and useHls is true
-		const streamLabel = (useHls.value && streamUrl) ? (isDash ? 'DASH' : 'HLS') : '';
-		const qualityLabel = replacementQuality.value || '';
 		
-		// Build the content
-		const contentParts = [];
-		if (filename) {
-			contentParts.push(`<span style="font-weight: 500;">${filename}</span>`);
+		// Title: filename_download or id
+		const title = fileData ? (fileData.filename_download || fileData.id) : '';
+		const titleHtml = title ? `<div class="title" style="font-weight: 500; margin-bottom: 4px;">${title}</div>` : '';
+		
+		// Meta line 1: width x height, filesize, type
+		const metaParts1: string[] = [];
+		if (fileData?.width && fileData?.height) {
+			metaParts1.push(`${fileData.width}x${fileData.height}`);
 		}
-		if (streamLabel) {
-			contentParts.push(`<span class="${isDash ? 'dash' : 'hls'}-label" style="background: var(--theme--primary, #6644ff); color: var(--white, #fff); padding: 2px 6px; border-radius: 4px; font-weight: 500; font-size: 11px;">${streamLabel}</span>`);
+		if (fileData?.filesize) {
+			metaParts1.push(formatFileSize(fileData.filesize));
 		}
-		if (qualityLabel) {
-			contentParts.push(`<span class="quality-label" style="background: var(--theme--primary, #6644ff); color: var(--white, #fff); padding: 2px 6px; border-radius: 4px; font-weight: 500; font-size: 11px;">${qualityLabel}</span>`);
+		if (fileData?.type) {
+			metaParts1.push(fileData.type);
 		}
+		const meta1Html = metaParts1.length > 0 ? `<div class="meta" style="margin-bottom: 4px;">${metaParts1.join(' • ')}</div>` : '';
+		
+		// Meta line 2: stream link filename (only in stream mode)
+		const streamFilename = (useHls.value && streamUrl && typeof streamUrl === 'string') ? streamUrl.split('/').pop() : '';
+		const meta2Html = streamFilename ? `<div class="meta" style="margin-bottom: 4px;">${streamFilename}</div>` : '';
+		
+		// Meta line 3: labels
+		const labelParts: string[] = [];
+		if (useHls.value && streamUrl) {
+			// Stream mode: show DASH/HLS and quality labels
+			labelParts.push(`<span class="${isDash ? 'dash' : 'hls'}-label" style="background: var(--theme--primary, #6644ff); color: var(--white, #fff); padding: 2px 6px; border-radius: 4px; font-weight: 500; font-size: 11px;">${isDash ? 'DASH' : 'HLS'}</span>`);
+			if (replacementQuality.value) {
+				labelParts.push(`<span class="quality-label" style="background: var(--theme--primary, #6644ff); color: var(--white, #fff); padding: 2px 6px; border-radius: 4px; font-weight: 500; font-size: 11px;">${replacementQuality.value}</span>`);
+			}
+		}
+		const meta3Html = labelParts.length > 0 ? `<div class="meta" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">${labelParts.join('')}</div>` : '';
 		
 		infoOverlay.innerHTML = `
-			<div style="color: var(--theme--foreground-inverse-subdued, rgba(255, 255, 255, 0.7)); font-size: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-				${contentParts.join('')}
+			<div style="color: var(--theme--foreground-inverse-subdued, rgba(255, 255, 255, 0.7)); font-size: 12px; display: flex; flex-direction: column;">
+				${titleHtml}
+				${meta1Html}
+				${meta2Html}
+				${meta3Html}
 			</div>
 		`;
 	};

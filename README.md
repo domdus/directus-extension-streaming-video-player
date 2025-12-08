@@ -14,13 +14,13 @@ This extension adds a video player interface to Directus allowing you to play vi
 - **Adaptive Streaming**: Play adaptive HLS (m3u8) and MPEG-DASH (mpd) video streams
 - **Quality Labels**: Display current stream quality (e.g., 720p, 1080p, 4K) for both HLS and DASH streams
 - **Standard Videos**: Support for MP4 and other standard video formats
-- **File Upload**: Uses Directus native drap & drop upload component known from default image interface
-- **File Module Integration**: HLS and DASH streaming on Directus file detail pages (instead of progressive download)
+- **File Upload**: Uses Directus native drag & drop upload component known from default image interface
+- **File Module Integration**: HLS and DASH streaming on Directus file detail pages (with custom field)
 - **Keeps Native Interface Options**:
   - Default upload folder & filter for files
   - Directus native options for input fields. 
 - **Poster Images**: Display poster images for video previews
-- **Native Player**: Full-featured HTML5 video player with controls, no fancy themes, small footprint
+- **Native Player**: Full-featured HTML5 video player with controls, no fancy themes
 
 ## Installation
 
@@ -34,17 +34,18 @@ This extension adds a video player interface to Directus allowing you to play vi
 
 ### Manual Installation
 
-1. Copy the extension to your Directus extensions directory
+1. Copy the `dist` folder to your Directus extensions directory:
 2. Restart your Directus instance
 
-To make HLS video sources work, update your CSP directives as follows:
+### Update CSP
+To make HLS/DASH Streaming work, update your CSP directives as follows:
 ```env
 CONTENT_SECURITY_POLICY_DIRECTIVES__MEDIA_SRC=array:'self', blob: data:
 ```
 
 ## Usage
 
-### String Fields (Stream Links)
+### String Fields
 
 Use this interface on string fields to play HLS or MPEG-DASH stream links:
 
@@ -55,11 +56,14 @@ Use this interface on string fields to play HLS or MPEG-DASH stream links:
    - **HLS streams**: URLs ending in `.m3u8` (e.g., `https://example.com/video.m3u8`)
    - **DASH streams**: URLs ending in `.mpd` (e.g., `https://example.com/video.mpd`)
 
-<img width="400px" alt="screenshot_stream_link" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_stream_link.png" />
+<div style="display: flex; gap: 10px;">
+  <img width="400px" alt="screenshot_stream_link" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_stream_link.png" />
+  <img width="400px" alt="screenshot_stream_link" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_stream_link_2".png" />
+</div>
 
-### Directus Files (Local Videos)
+### Directus Files
 
-Use this interface on relational file fields to play uploaded video files:
+Use this interface on file fields to play uploaded video files:
 
 1. Go to your collection settings
 2. Select a file field (UUID type)
@@ -70,19 +74,15 @@ The player supports MP4 and other standard video formats.
 
 ### File Module Integration
 
-You may want to keep your stream links next to your source Directus files (videos). When applied to a custom string field in the `directus_files` collection, this extension will replace the default video player in the file detail page and prefer playing the HLS or DASH stream:
+When applied to a custom string field in `directus_files`, this extension will replace the default video player in the file detail page and prefer playing the HLS or DASH stream:
 
 1. Add a string field to `directus_files` (e.g., `stream_link`)
 2. Set the interface to **Streaming Video Player**
 3. In directus_files item detail view: Enter stream link in the custom field and it will be picked up by the player
 
-Use the toggle button to switch between stream (HLS/DASH) and source file playback.
+<img width="400px" alt="screenshot_files_detail_file" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_files_detail_file.png" />
 
-
-<div style="display: flex; gap: 10px;">
-  <img width="300px" alt="screenshot_files_detail_hls" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_files_detail_hls.png" />
-  <img width="300px" alt="screenshot_files_detail_file" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_files_detail_file.png" />
-</div>
+*Use the toggle button to switch between stream (HLS/DASH) and source file playback.*
 
 ## Configuration
 
@@ -112,7 +112,7 @@ Use the toggle button to switch between stream (HLS/DASH) and source file playba
   - Player link: `https://example.com/stream/my_video.m3u8`
 
 - **Token Expiration (minutes)**: Token expiration time in minutes (default: 60)
-- **Include IP**: Include client IP address in secure token generation for client-unique stream link protection (optional, default: false)
+- **Include IP**: (Not available yet) Include client IP address in secure token generation for client-unique stream link protection (optional, default: false)
 
 
 ## License

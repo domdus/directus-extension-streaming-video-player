@@ -24,7 +24,6 @@ export default defineInterface({
 				field: 'streaming_config',
 				name: 'Streaming Configuration',
 				type: 'alias' as const,
-				schema: null,
 				meta: {
 					field: 'streaming_config',
 					width: 'full' as const,
@@ -40,7 +39,6 @@ export default defineInterface({
 				field: 'field_options',
 				name: 'Field Options',
 				type: 'alias' as const,
-				schema: null,
 				meta: {
 					field: 'field_options',
 					width: 'full' as const,
@@ -198,7 +196,7 @@ export default defineInterface({
 					options: {
 						placeholder: typeof window !== 'undefined' ? window.location.origin : ''
 					},
-					note: `Host domain (e.g., https://example.com). Default: ${typeof window !== 'undefined' ? window.location.origin : ''}. Leave empty when working with fully qualified URLs in collection field.`
+					note: `Host domain (e.g., https://example.com). Default: ${typeof window !== 'undefined' ? window.location.origin : ''}. Leave empty when working with fully qualified URLs in collection.`
 				}
 			};
 
@@ -265,7 +263,7 @@ export default defineInterface({
 					options: {
 						label: 'Include client IP'
 					},
-					note: 'Include client IP address into secure token generation for client unique stream link protection',
+					note: '(NOT AVAILABLE YET) Include client IP address into secure token generation for client unique stream link protection',
 					conditions: [
 						{
 							name: 'Hide when stream_secret is empty',
@@ -336,7 +334,7 @@ export default defineInterface({
 				field: 'info-notice',
 				name: 'Info',
 				type: 'alias' as const,
-				schema: null,
+				schema: undefined,
 				meta: {
 					width: 'full' as const,
 					interface: 'presentation-notice',
@@ -394,7 +392,7 @@ export default defineInterface({
 				options: {
 					placeholder: typeof window !== 'undefined' ? window.location.origin : ''
 				},
-				note: `Host domain (e.g., https://example.com). Default: ${typeof window !== 'undefined' ? window.location.origin : ''}. Leave empty when working with fully qualified URLs in collection field.`
+				note: `Host domain (e.g., https://example.com). Default: ${typeof window !== 'undefined' ? window.location.origin : ''}. Leave empty when working with fully qualified URLs in collection.`
 			}
 		};
 
@@ -437,7 +435,6 @@ export default defineInterface({
 			field: 'streaming_config',
 			name: 'Streaming Configuration',
 			type: 'alias' as const,
-			schema: null,
 			meta: {
 				field: 'streaming_config',
 				width: 'full' as const,
@@ -574,7 +571,7 @@ export default defineInterface({
 				options: {
 					placeholder: 'Field name in directus_files'
 				},
-				note: 'Optional: Name of the field in the RELATED (m2o) directus_files collection',
+				note: 'Optional: Name of the field in the related directus_files collection',
 				validation: {
 					_and: [
 						{
@@ -613,7 +610,6 @@ export default defineInterface({
 			field: 'field_options',
 			name: 'Field Options',
 			type: 'alias' as const,
-			schema: null,
 			meta: {
 				field: 'field_options',
 				width: 'full' as const,
@@ -631,7 +627,6 @@ export default defineInterface({
 			field: 'info-notice',
 			name: 'Info',
 			type: 'alias' as const,
-			schema: null,
 			meta: {
 				width: 'full' as const,
 				interface: 'presentation-notice',
