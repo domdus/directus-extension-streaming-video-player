@@ -58,7 +58,7 @@ Use this interface on string fields to play HLS or MPEG-DASH stream links:
 
 <div style="display: flex; gap: 10px;">
   <img width="400px" alt="screenshot_stream_link" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_stream_link.png" />
-  <img width="400px" alt="screenshot_stream_link" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_stream_link_2".png" />
+  <img width="400px" alt="screenshot_stream_link" src="https://raw.githubusercontent.com/domdus/directus-extension-streaming-video-player/main/docs/screenshot_stream_link_2.png".png" />
 </div>
 
 ### Directus Files
