@@ -34,8 +34,23 @@ This extension adds a video player interface to Directus allowing you to play vi
 
 ### Manual Installation
 
-1. Copy the `dist` folder to your Directus extensions directory:
-2. Restart your Directus instance
+1. Install package
+
+```bash
+npm install directus-extension-streaming-video-player
+```
+
+2. Build the extension:
+```bash
+npm run build
+```
+
+3. Copy the `dist` folder to your Directus extensions directory:
+```
+directus/extensions/directus-extension-streaming-video-player/
+```
+
+4. Restart your Directus instance
 
 ### Update CSP
 To make HLS/DASH Streaming work, update your CSP directives as follows:
