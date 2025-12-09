@@ -108,19 +108,73 @@ export function useReplacementPlayer(
 							}
 						});
 
-						const updateDashQuality = () => {
+						// Helper function to update quality - using the same approach as useDashPlayer.ts
+						const updateDashQuality = (representation?: any) => {
 							try {
 								const playerAny = dashPlayer as any;
-								const videoRepresentations = playerAny.getRepresentationsForType?.('video');
-								if (!videoRepresentations || videoRepresentations.length === 0) return;
-								const currentQualityIndex = playerAny.getQualityFor?.('video') ?? -1;
-								if (currentQualityIndex >= 0 && currentQualityIndex < videoRepresentations.length) {
-									replacementQuality.value = formatQuality(videoRepresentations[currentQualityIndex].height);
-								} else if (videoRepresentations.length > 0) {
-									const sortedReps = [...videoRepresentations].sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
-									replacementQuality.value = formatQuality(sortedReps[0].height);
+								let currentRep = representation;
+								
+								// If representation provided from event, use it
+								if (currentRep && currentRep.height) {
+									const quality = formatQuality(currentRep.height);
+									if (quality) {
+										replacementQuality.value = quality;
+										updateReplacementPlayerInfo();
+										return;
+									}
 								}
-								updateReplacementPlayerInfo();
+								
+								// Try new API methods first
+								if (!currentRep) {
+									currentRep = playerAny.getCurrentRepresentationForType?.('video');
+								}
+								
+								// Try old API methods as fallback (for older dash.js versions)
+								if (!currentRep) {
+									const qualityIndex = playerAny.getQualityFor?.('video');
+									if (qualityIndex !== undefined && qualityIndex !== null) {
+										const bitrateList = playerAny.getBitrateInfoListFor?.('video') || [];
+										if (bitrateList[qualityIndex]) {
+											currentRep = bitrateList[qualityIndex];
+										}
+									}
+								}
+								
+								// Try getting from representations list
+								if (!currentRep) {
+									const representations = playerAny.getRepresentationsByType?.('video') || [];
+									if (representations.length > 0) {
+										// Try to find current representation by quality index
+										const qualityIndex = playerAny.getQualityFor?.('video');
+										if (qualityIndex !== undefined && qualityIndex !== null && representations[qualityIndex]) {
+											currentRep = representations[qualityIndex];
+										} else {
+											currentRep = representations[0];
+										}
+									}
+								}
+								
+								// Fallback: use video element dimensions
+								if (!currentRep || !currentRep.height) {
+									const videoHeight = videoEl.videoHeight;
+									if (videoHeight && videoHeight > 0) {
+										const quality = formatQuality(videoHeight);
+										if (quality) {
+											replacementQuality.value = quality;
+											updateReplacementPlayerInfo();
+											return;
+										}
+									}
+								}
+								
+								// If we have a representation with height, use it
+								if (currentRep && currentRep.height) {
+									const quality = formatQuality(currentRep.height);
+									if (quality) {
+										replacementQuality.value = quality;
+										updateReplacementPlayerInfo();
+									}
+								}
 							} catch (error) {
 								console.warn('[ReplacementPlayer] Error updating DASH quality:', error);
 							}
@@ -128,13 +182,23 @@ export function useReplacementPlayer(
 
 						const Events = dashjs.MediaPlayer.events;
 						if (Events) {
+							// Listen for stream initialized - representations are available after this
 							if (Events.STREAM_INITIALIZED) {
 								dashPlayer.on(Events.STREAM_INITIALIZED, () => {
 									setTimeout(updateDashQuality, 200);
 								});
 							}
+							
+							// Listen for quality changes - event provides newRepresentation directly
 							if (Events.QUALITY_CHANGE_RENDERED) {
-								dashPlayer.on(Events.QUALITY_CHANGE_RENDERED, updateDashQuality);
+								dashPlayer.on(Events.QUALITY_CHANGE_RENDERED, (e: any) => {
+									// Use the representation from the event like the reference player does
+									if (e && e.newRepresentation && e.mediaType === 'video') {
+										updateDashQuality(e.newRepresentation);
+									} else {
+										updateDashQuality();
+									}
+								});
 							}
 						}
 
@@ -144,7 +208,10 @@ export function useReplacementPlayer(
 						videoEl.addEventListener('loadedmetadata', () => {
 							setTimeout(updateDashQuality, 300);
 						});
-						setTimeout(updateDashQuality, 1000);
+						// Initial quality check with retries
+						setTimeout(updateDashQuality, 500);
+						setTimeout(updateDashQuality, 1500);
+						setTimeout(updateDashQuality, 3000);
 					} catch (error) {
 						console.error('[ReplacementPlayer] Error setting up DASH:', error);
 						setupDashPlayer(videoEl, streamUrl);
@@ -224,7 +291,7 @@ export function useReplacementPlayer(
 		
 		// Title: filename_download or id
 		const title = fileData ? (fileData.filename_download || fileData.id) : '';
-		const titleHtml = title ? `<div class="title" style="font-weight: 500; margin-bottom: 4px;">${title}</div>` : '';
+		const titleHtml = title ? `<div class="title" style="color: var(--theme--foreground-inverse, #fff); font-size: 14px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${title}</div>` : '';
 		
 		// Meta line 1: width x height, filesize, type
 		const metaParts1: string[] = [];
@@ -255,7 +322,7 @@ export function useReplacementPlayer(
 		const meta3Html = labelParts.length > 0 ? `<div class="meta" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">${labelParts.join('')}</div>` : '';
 		
 		infoOverlay.innerHTML = `
-			<div style="color: var(--theme--foreground-inverse-subdued, rgba(255, 255, 255, 0.7)); font-size: 12px; display: flex; flex-direction: column;">
+			<div class="info" style="color: var(--theme--foreground-inverse-subdued, rgba(255, 255, 255, 0.7)); font-size: 12px; display: flex; flex-direction: column;">
 				${titleHtml}
 				${meta1Html}
 				${meta2Html}
@@ -465,23 +532,73 @@ export function useReplacementPlayer(
 						}
 					});
 
-					// Helper to update quality for replacement DASH player
-					const updateReplacementDashQuality = () => {
+					// Helper function to update quality - using the same approach as useDashPlayer.ts
+					const updateReplacementDashQuality = (representation?: any) => {
 						try {
 							const playerAny = dashPlayer as any;
-							const videoRepresentations = playerAny.getRepresentationsForType?.('video');
-							if (!videoRepresentations || videoRepresentations.length === 0) return;
-
-							const currentQualityIndex = playerAny.getQualityFor?.('video') ?? -1;
+							let currentRep = representation;
 							
-							if (currentQualityIndex >= 0 && currentQualityIndex < videoRepresentations.length) {
-								const currentRep = videoRepresentations[currentQualityIndex];
-								replacementQuality.value = formatQuality(currentRep.height);
-							} else if (videoRepresentations.length > 0) {
-								const sortedReps = [...videoRepresentations].sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
-								replacementQuality.value = formatQuality(sortedReps[0].height);
+							// If representation provided from event, use it
+							if (currentRep && currentRep.height) {
+								const quality = formatQuality(currentRep.height);
+								if (quality) {
+									replacementQuality.value = quality;
+									updateReplacementPlayerInfo();
+									return;
+								}
 							}
-							updateReplacementPlayerInfo();
+							
+							// Try new API methods first
+							if (!currentRep) {
+								currentRep = playerAny.getCurrentRepresentationForType?.('video');
+							}
+							
+							// Try old API methods as fallback (for older dash.js versions)
+							if (!currentRep) {
+								const qualityIndex = playerAny.getQualityFor?.('video');
+								if (qualityIndex !== undefined && qualityIndex !== null) {
+									const bitrateList = playerAny.getBitrateInfoListFor?.('video') || [];
+									if (bitrateList[qualityIndex]) {
+										currentRep = bitrateList[qualityIndex];
+									}
+								}
+							}
+							
+							// Try getting from representations list
+							if (!currentRep) {
+								const representations = playerAny.getRepresentationsByType?.('video') || [];
+								if (representations.length > 0) {
+									// Try to find current representation by quality index
+									const qualityIndex = playerAny.getQualityFor?.('video');
+									if (qualityIndex !== undefined && qualityIndex !== null && representations[qualityIndex]) {
+										currentRep = representations[qualityIndex];
+									} else {
+										currentRep = representations[0];
+									}
+								}
+							}
+							
+							// Fallback: use video element dimensions
+							if (!currentRep || !currentRep.height) {
+								const videoHeight = videoEl.videoHeight;
+								if (videoHeight && videoHeight > 0) {
+									const quality = formatQuality(videoHeight);
+									if (quality) {
+										replacementQuality.value = quality;
+										updateReplacementPlayerInfo();
+										return;
+									}
+								}
+							}
+							
+							// If we have a representation with height, use it
+							if (currentRep && currentRep.height) {
+								const quality = formatQuality(currentRep.height);
+								if (quality) {
+									replacementQuality.value = quality;
+									updateReplacementPlayerInfo();
+								}
+							}
 						} catch (error) {
 							console.warn('[ReplacementPlayer] Error updating DASH quality:', error);
 						}
@@ -490,16 +607,22 @@ export function useReplacementPlayer(
 					// Set up event listeners for quality tracking
 					const Events = dashjs.MediaPlayer.events;
 					if (Events) {
+						// Listen for stream initialized - representations are available after this
 						if (Events.STREAM_INITIALIZED) {
 							dashPlayer.on(Events.STREAM_INITIALIZED, () => {
-								setTimeout(() => {
-									updateReplacementDashQuality();
-								}, 200);
+								setTimeout(updateReplacementDashQuality, 200);
 							});
 						}
+						
+						// Listen for quality changes - event provides newRepresentation directly
 						if (Events.QUALITY_CHANGE_RENDERED) {
-							dashPlayer.on(Events.QUALITY_CHANGE_RENDERED, () => {
-								updateReplacementDashQuality();
+							dashPlayer.on(Events.QUALITY_CHANGE_RENDERED, (e: any) => {
+								// Use the representation from the event like the reference player does
+								if (e && e.newRepresentation && e.mediaType === 'video') {
+									updateReplacementDashQuality(e.newRepresentation);
+								} else {
+									updateReplacementDashQuality();
+								}
 							});
 						}
 					}
@@ -523,10 +646,16 @@ export function useReplacementPlayer(
 						}, 500);
 					});
 					
-					// Initial quality check
+					// Initial quality check with retries
 					setTimeout(() => {
 						updateReplacementDashQuality();
-					}, 1000);
+					}, 500);
+					setTimeout(() => {
+						updateReplacementDashQuality();
+					}, 1500);
+					setTimeout(() => {
+						updateReplacementDashQuality();
+					}, 3000);
 				} catch (error) {
 					console.error('[ReplacementPlayer] Error setting up DASH:', error);
 					// Fallback to setupDashPlayer
