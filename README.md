@@ -129,6 +129,15 @@ When applied to a custom string field in `directus_files`, this extension will r
 - **Token Expiration (minutes)**: Token expiration time in minutes (default: 60)
 - **Include IP**: (Not available yet) Include client IP address in secure token generation for client-unique stream link protection (optional, default: false)
 
+## Integration with Transcode Video Operation
+
+This player works seamlessly with the [Transcode Video Operation](https://github.com/domdus/directus-extension-transcode-video-operation) extension (available in Directus Marketplace):
+
+1. Use the Transcode Video Operation to convert standard videos to HLS format with multiple quality levels
+2. Store the master playlist reference in a string field (e.g., `/assets/:uuid`)
+3. Apply Streaming Video Player interface on that string field to play the adaptive HLS stream
+4. The player will automatically detect and play the HLS stream with quality selection
+
 
 ## License
 
