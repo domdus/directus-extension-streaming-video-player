@@ -7,6 +7,7 @@ import * as dashjs from 'dashjs';
 export interface DashPlayerInstance {
 	dashInstance: Ref<dashjs.MediaPlayerClass | null>;
 	currentQuality: Ref<string | null>;
+	cspError: Ref<string | null>;
 	setupDashPlayer: (videoEl: HTMLVideoElement, streamUrl: string, fallback?: () => void) => void;
 	cleanupDash: (videoElement?: HTMLVideoElement | null) => void;
 }
@@ -43,17 +44,38 @@ export function isDashStream(url: string): boolean {
 /**
  * Setup DASH player on a video element
  */
+// Import the shared console error interceptor setup (we'll need to export it from useHlsPlayer or create a shared module)
+// For now, we'll use a similar pattern but register with the shared callback system
+// We need to import the setup function and callback registry from useHlsPlayer
+// Actually, let's create a shared approach - DASH will also detect CSP errors via video element errors
+
 export function useDashPlayer(videoElement: Ref<HTMLVideoElement | null>): DashPlayerInstance {
 	const dashInstance = ref<dashjs.MediaPlayerClass | null>(null);
 	const currentQuality = ref<string | null>(null);
+	const cspError = ref<string | null>(null);
 	// Track event listener cleanup functions per video element
 	const eventCleanups = new Map<HTMLVideoElement, () => void>();
+	
+	// Helper function to set CSP error
+	const setCspError = () => {
+		// Only set error if not already set to avoid unnecessary updates
+		if (cspError.value) {
+			return;
+		}
+		const errorMessage = 'Content Security Policy (CSP) is blocking DASH streaming. Please add the following environment variable to your Directus configuration:\n\nCONTENT_SECURITY_POLICY_DIRECTIVES__MEDIA_SRC=array:\'self\', blob: data:';
+		cspError.value = errorMessage;
+	};
 	
 
 		const setupDashPlayer = (videoEl: HTMLVideoElement, streamUrl: string, fallback?: () => void) => {
 			if (!streamUrl) {
 				if (fallback) fallback();
 				return;
+			}
+
+			// Reset CSP error when setting up a new player
+			if (videoEl === videoElement.value) {
+				cspError.value = null;
 			}
 
 			// Clean up any existing player for this video element first
@@ -186,22 +208,13 @@ export function useDashPlayer(videoElement: Ref<HTMLVideoElement | null>): DashP
 			// Set up event listeners - using official dash.js reference player approach
 			const Events = dashjs.MediaPlayer.events;
 			if (Events && isMainPlayer) {
-				console.log('[DashPlayer] Setting up event listeners for main player');
-				
 				// Listen for stream initialized - representations are available after this
 				if (Events.STREAM_INITIALIZED) {
 					player.on(Events.STREAM_INITIALIZED, () => {
-						console.log('[DashPlayer] STREAM_INITIALIZED event fired', {
-							videoElMatches: videoEl === videoElement.value,
-							hasStoredInstance: !!dashInstance.value
-						});
 						// Only update if this is the main video element
 						// Don't check player instance - use whatever is stored
 						if (videoEl === videoElement.value && dashInstance.value) {
-							console.log('[DashPlayer] Calling updateQuality from STREAM_INITIALIZED');
 							updateQuality();
-						} else {
-							console.log('[DashPlayer] Skipping updateQuality - not main video or no instance');
 						}
 					});
 				}
@@ -209,34 +222,44 @@ export function useDashPlayer(videoElement: Ref<HTMLVideoElement | null>): DashP
 				// Listen for quality changes - event provides newRepresentation directly
 				if (Events.QUALITY_CHANGE_RENDERED) {
 					player.on(Events.QUALITY_CHANGE_RENDERED, (e: any) => {
-						console.log('[DashPlayer] QUALITY_CHANGE_RENDERED event fired', {
-							videoElMatches: videoEl === videoElement.value,
-							hasStoredInstance: !!dashInstance.value,
-							hasNewRep: !!(e && e.newRepresentation),
-							mediaType: e?.mediaType
-						});
 						// Only update if this is the main video element
 						// Don't check player instance - use whatever is stored
 						if (videoEl === videoElement.value && dashInstance.value) {
-							console.log('[DashPlayer] Calling updateQuality from QUALITY_CHANGE_RENDERED');
 							// Use the representation from the event like the reference player does
 							if (e && e.newRepresentation && e.mediaType === 'video') {
 								updateQuality(e.newRepresentation);
 							} else {
 								updateQuality();
 							}
-						} else {
-							console.log('[DashPlayer] Skipping updateQuality - not main video or no instance');
 						}
 					});
 				}
-			} else {
-				console.log('[DashPlayer] Not setting up event listeners', {
-					hasEvents: !!Events,
-					isMainPlayer: isMainPlayer
-				});
 			}
 
+		// Error handler for video element errors (CSP detection)
+		const handleVideoError = (event: Event) => {
+			const error = (event.target as HTMLVideoElement)?.error;
+			if (error) {
+				// Only treat as CSP error if:
+				// 1. Error code is 4 (MEDIA_ERR_SRC_NOT_SUPPORTED) AND
+				// 2. Error message contains "URL safety check" (this is the specific message for CSP blocking blob URLs)
+				// Do NOT treat error code 2 (network errors like 404/403) as CSP
+				if (error.code === 4) {
+					const errorMessage = error.message || '';
+					// Error code 4 with "URL safety check" message is specifically CSP blocking blob URLs
+					if (errorMessage.includes('URL safety check')) {
+						if (dashInstance.value && videoEl === videoElement.value) {
+							setCspError();
+						}
+					}
+				}
+				// Do NOT set CSP error for error code 2 (network errors) - these are 404/403/etc, not CSP
+			}
+		};
+			
+			// Listen for video element errors
+			videoEl.addEventListener('error', handleVideoError);
+			
 			// Also listen to video element metadata events as fallback
 			if (isMainPlayer) {
 				const onLoadedMetadata = () => {
@@ -248,10 +271,48 @@ export function useDashPlayer(videoElement: Ref<HTMLVideoElement | null>): DashP
 				videoEl.addEventListener('loadedmetadata', onLoadedMetadata);
 				
 				// Store cleanup function for this video element
+				const existingCleanup = eventCleanups.get(videoEl);
 				eventCleanups.set(videoEl, () => {
+					videoEl.removeEventListener('error', handleVideoError);
 					videoEl.removeEventListener('loadedmetadata', onLoadedMetadata);
+					if (existingCleanup) {
+						existingCleanup();
+					}
+				});
+			} else {
+				// Store cleanup for error handler even if not main player
+				const existingCleanup = eventCleanups.get(videoEl);
+				eventCleanups.set(videoEl, () => {
+					videoEl.removeEventListener('error', handleVideoError);
+					if (existingCleanup) {
+						existingCleanup();
+					}
 				});
 			}
+			
+		// Also try to detect CSP errors by checking if video fails to load after a delay
+		// This is a fallback for when the error event doesn't fire properly
+		// Only check for error code 4 with "URL safety check" message (specific CSP indicator)
+		const checkForCspError = setTimeout(() => {
+			if (videoEl === videoElement.value && dashInstance.value) {
+				// Check if video is in error state
+				if (videoEl.error) {
+					const error = videoEl.error;
+					const errorMessage = error.message || '';
+					
+					// Only treat as CSP if error code is 4 with "URL safety check" message
+					// Do NOT treat error code 2 (network errors like 404/403) as CSP
+					if (error.code === 4 && errorMessage.includes('URL safety check')) {
+						setCspError();
+					}
+				}
+			}
+		}, 2000); // Check after 2 seconds
+			
+			// Clear the timeout if video loads successfully
+			videoEl.addEventListener('loadedmetadata', () => {
+				clearTimeout(checkForCspError);
+			}, { once: true });
 			
 			// Initialize player with video element and stream URL
 			player.initialize(videoEl, streamUrl, false);
@@ -284,13 +345,17 @@ export function useDashPlayer(videoElement: Ref<HTMLVideoElement | null>): DashP
 			dashInstance.value = null;
 		}
 		
-		// Reset quality when cleaning up
+		// Reset quality and error when cleaning up
 		currentQuality.value = null;
+		if (videoEl === videoElement.value) {
+			cspError.value = null;
+		}
 	};
 
 	return {
 		dashInstance: dashInstance as Ref<dashjs.MediaPlayerClass | null>,
 		currentQuality: currentQuality as Ref<string | null>,
+		cspError: cspError as Ref<string | null>,
 		setupDashPlayer,
 		cleanupDash
 	};

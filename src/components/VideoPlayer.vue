@@ -264,7 +264,7 @@ defineExpose({
 
 .info .meta .hls-label {
 	background: var(--theme--primary, #6644ff);
-	color: var(--white, #fff);
+	color: var(--theme--foreground-inverse, #fff);
 	margin-top: 4px;
 	padding: 2px 6px;
 	border-radius: 4px;
@@ -274,7 +274,7 @@ defineExpose({
 
 .info .meta .quality-label {
 	background: var(--theme--primary, #6644ff);
-	color: var(--white, #fff);
+	color: var(--theme--foreground-inverse, #fff);
 	margin-top: 4px;
 	padding: 2px 6px;
 	border-radius: 4px;

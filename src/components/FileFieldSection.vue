@@ -105,6 +105,17 @@
 					</div>
 				</div>
 			</div>
+			<!-- CSP Error Message -->
+			<div v-if="props.cspError" class="csp-error-container">
+				<v-notice type="warning" :dismissable="false">
+					<template #title>CSP Configuration Required</template>
+					<template #default>
+						<div class="csp-error-message">
+							{{ props.cspError }}
+						</div>
+					</template>
+				</v-notice>
+			</div>
 		</div>
 	</div>
 </template>
@@ -125,6 +136,7 @@ interface Props {
 	downloadUrl: string | null;
 	streamLinkFieldName: string;
 	currentQuality?: string | null;
+	cspError?: string | null;
 	createAllowed: boolean;
 	enableCreateValue: boolean;
 	enableSelectValue: boolean;
@@ -316,7 +328,7 @@ defineExpose({
 .info .meta .hls-label,
 .info .meta .dash-label {
 	background: var(--theme--primary, #6644ff);
-	color: var(--white, #fff);
+	color: var(--theme--foreground-inverse, #fff);
 	margin-top: 4px;
 	padding: 2px 6px;
 	border-radius: 4px;
@@ -326,7 +338,7 @@ defineExpose({
 
 .info .meta .quality-label {
 	background: var(--theme--primary, #6644ff);
-	color: var(--white, #fff);
+	color: var(--theme--foreground-inverse, #fff);
 	margin-top: 4px;
 	padding: 2px 6px;
 	border-radius: 4px;
@@ -373,6 +385,19 @@ defineExpose({
 
 .video-player::-moz-media-controls-loading-panel {
 	display: none !important;
+}
+
+.csp-error-container {
+	margin-block-start: 12px;
+	max-width: 800px;
+	margin-inline: auto;
+}
+
+.csp-error-message {
+	white-space: pre-line;
+	font-family: monospace;
+	font-size: 12px;
+	line-height: 1.5;
 }
 </style>
 

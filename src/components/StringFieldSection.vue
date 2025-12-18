@@ -91,6 +91,17 @@
 					</div>
 				</div>
 			</div>
+			<!-- CSP Error Message -->
+			<div v-if="props.cspError" class="csp-error-container">
+				<v-notice type="warning" :dismissable="false">
+					<template #title>CSP Configuration Required</template>
+					<template #default>
+						<div class="csp-error-message">
+							{{ props.cspError }}
+						</div>
+					</template>
+				</v-notice>
+			</div>
 			<!-- Toggle button below player - only show for file item pages -->
 			<div v-if="isFileModule" class="format-toggle-container">
 				<button
@@ -119,6 +130,7 @@ interface Props {
 	videoPreload: string;
 	useHls: boolean;
 	currentQuality?: string | null;
+	cspError?: string | null;
 	disabled?: boolean;
 	inputOptions: InputOptions;
 	inputPlaceholder: string;
@@ -336,7 +348,7 @@ defineExpose({
 .info .meta .hls-label,
 .info .meta .dash-label {
 	background: var(--theme--primary, #6644ff);
-	color: var(--white, #fff);
+	color: var(--theme--foreground-inverse, #fff);
 	margin-top: 4px;
 	padding: 2px 6px;
 	border-radius: 4px;
@@ -346,7 +358,7 @@ defineExpose({
 
 .info .meta .quality-label {
 	background: var(--theme--primary, #6644ff);
-	color: var(--white, #fff);
+	color: var(--theme--foreground-inverse, #fff);
 	margin-top: 4px;
 	padding: 2px 6px;
 	border-radius: 4px;
@@ -416,6 +428,19 @@ defineExpose({
 
 .format-toggle:hover {
 	opacity: 0.8;
+}
+
+.csp-error-container {
+	margin-block-start: 12px;
+	max-width: 800px;
+	margin-inline: auto;
+}
+
+.csp-error-message {
+	white-space: pre-line;
+	font-family: monospace;
+	font-size: 12px;
+	line-height: 1.5;
 }
 </style>
 

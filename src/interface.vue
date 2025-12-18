@@ -13,6 +13,7 @@
 			:video-preload="videoPreload"
 			:use-hls="useHls"
 			:current-quality="currentQuality"
+			:csp-error="cspError"
 			:disabled="disabled"
 			:input-options="inputOptions"
 			:input-placeholder="inputPlaceholder"
@@ -40,6 +41,7 @@
 			:download-url="downloadUrl"
 			:stream-link-field-name="streamLinkFieldName"
 			:current-quality="currentQuality"
+			:csp-error="cspError"
 			:create-allowed="createAllowed"
 			:enable-create-value="enableCreateValue"
 			:enable-select-value="enableSelectValue"
@@ -145,8 +147,11 @@ let srcCheckTimeout: ReturnType<typeof setTimeout> | null = null;
 // Composables
 const { fileData, loading, loadFileData, clearFileData } = useFileData();
 const { inputOptions, inputPlaceholder, processValue } = useInputOptions(attrs);
-const { hlsInstance, playEventListener, currentQuality: hlsQuality, setupHlsPlayer, cleanupHls } = useHlsPlayer(videoElement);
-const { dashInstance, currentQuality: dashQuality, setupDashPlayer, cleanupDash } = useDashPlayer(videoElement);
+const { hlsInstance, playEventListener, currentQuality: hlsQuality, cspError: hlsCspError, setupHlsPlayer, cleanupHls } = useHlsPlayer(videoElement);
+const { dashInstance, currentQuality: dashQuality, cspError: dashCspError, setupDashPlayer, cleanupDash } = useDashPlayer(videoElement);
+
+// Combine CSP errors from both HLS and DASH players
+const cspError = computed(() => hlsCspError.value || dashCspError.value);
 const { getStreamUrl, apiBaseUrl } = useStreamUrl({
 	api,
 	hostUrl: attrs.host_url as string,

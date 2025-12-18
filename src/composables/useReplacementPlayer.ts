@@ -8,6 +8,20 @@ import { getFileIdFromContext, formatFileSize } from '../utils';
 import type { useApi } from '@directus/extensions-sdk';
 import { isDashStream } from './useDashPlayer';
 
+/**
+ * Check if an error message indicates a CSP violation
+ */
+function isCspError(errorMessage: string): boolean {
+	const cspKeywords = [
+		'Content Security Policy',
+		'media-src',
+		'blob:',
+		'violates the following Content Security Policy directive'
+	];
+	const lowerMessage = errorMessage.toLowerCase();
+	return cspKeywords.some(keyword => lowerMessage.includes(keyword.toLowerCase()));
+}
+
 export function useReplacementPlayer(
 	props: any,
 	attrs: any,
@@ -23,9 +37,83 @@ export function useReplacementPlayer(
 	const replacementHlsInstance = ref<any>(null);
 	const replacementDashInstance = ref<dashjs.MediaPlayerClass | null>(null);
 	const replacementQuality = ref<string | null>(null);
+	const replacementCspError = ref<string | null>(null);
 	const currentFileId = ref<string | null>(null);
 	const currentFileType = ref<string | null>(null);
 	const currentFileData = ref<any>(null);
+	
+	// Helper function to set CSP error for replacement player
+	const setReplacementCspError = () => {
+		// Only set error if not already set to avoid unnecessary updates
+		if (replacementCspError.value) {
+			return;
+		}
+		const errorMessage = 'Content Security Policy (CSP) is blocking streaming. Please add the following environment variable to your Directus configuration:\n\nCONTENT_SECURITY_POLICY_DIRECTIVES__MEDIA_SRC=array:\'self\', blob: data:';
+		replacementCspError.value = errorMessage;
+		// Also update the UI to show the error
+		updateReplacementPlayerErrorDisplay();
+	};
+	
+	// Update error display in replacement player
+	const updateReplacementPlayerErrorDisplay = () => {
+		const container = document.querySelector('.file-preview');
+		if (!container) return;
+		
+		// Remove existing error display if any
+		const existingError = container.querySelector('.replacement-player-csp-error');
+		if (existingError) {
+			existingError.remove();
+		}
+		
+		// Add error display if there's an error
+		if (replacementCspError.value) {
+			const errorContainer = document.createElement('div');
+			errorContainer.className = 'replacement-player-csp-error';
+			errorContainer.style.cssText = `
+				margin-top: 12px;
+				max-width: 100%;
+			`;
+			
+			// Create notice-like element
+			const notice = document.createElement('div');
+			notice.style.cssText = `
+				background: var(--theme--warning-background, #fff3cd);
+				border: 1px solid var(--theme--warning-border, #ffc107);
+				border-radius: var(--theme--border-radius, 4px);
+				padding: 12px;
+			`;
+			
+			const title = document.createElement('div');
+			title.textContent = 'CSP Configuration Required';
+			title.style.cssText = `
+				font-weight: 600;
+				margin-bottom: 8px;
+				color: var(--theme--warning-foreground, #856404);
+			`;
+			
+			const message = document.createElement('div');
+			message.textContent = replacementCspError.value;
+			message.style.cssText = `
+				white-space: pre-line;
+				font-family: monospace;
+				font-size: 12px;
+				line-height: 1.5;
+				color: var(--theme--warning-foreground, #856404);
+			`;
+			
+			notice.appendChild(title);
+			notice.appendChild(message);
+			errorContainer.appendChild(notice);
+			
+			// Insert after video container
+			const videoContainer = container.querySelector('.video-container-wrapper') || container.querySelector('video')?.parentElement;
+			if (videoContainer && videoContainer.parentElement) {
+				videoContainer.parentElement.insertBefore(errorContainer, videoContainer.nextSibling);
+			} else {
+				container.appendChild(errorContainer);
+			}
+		}
+	};
 
 	// Format quality height to display string
 	const formatQuality = (height: number | undefined): string | null => {
@@ -75,12 +163,22 @@ export function useReplacementPlayer(
 			replacementDashInstance.value = null;
 		}
 		
-		// Reset quality
+		// Reset quality and CSP error
 		replacementQuality.value = null;
+		replacementCspError.value = null;
 		
 		// Clear video src
 		replacementVideoElement.value.src = '';
 		replacementVideoElement.value.removeAttribute('src');
+		
+		// Remove error display
+		const container = document.querySelector('.file-preview');
+		if (container) {
+			const existingError = container.querySelector('.replacement-player-csp-error');
+			if (existingError) {
+				existingError.remove();
+			}
+		}
 		
 		if (useHls.value) {
 			// Switch to streaming format (HLS or DASH)
@@ -205,7 +303,47 @@ export function useReplacementPlayer(
 						dashPlayer.initialize(videoEl, streamUrl, false);
 						replacementDashInstance.value = dashPlayer;
 						
+						// Error handler for video element errors (CSP detection ONLY)
+						const handleDashVideoError = (event: Event) => {
+							const error = (event.target as HTMLVideoElement)?.error;
+							if (error) {
+								// ONLY treat as CSP error if:
+								// Error code is 4 (MEDIA_ERR_SRC_NOT_SUPPORTED) AND
+								// Error message contains "URL safety check" (this is the SPECIFIC CSP indicator)
+								// Do NOT treat error code 2 (network errors like 404/403) as CSP
+								if (error.code === 4) {
+									const errorMessage = error.message || '';
+									// "URL safety check" is the specific message browsers show when CSP blocks blob URLs
+									if (errorMessage.includes('URL safety check')) {
+										if (replacementDashInstance.value) {
+											setReplacementCspError();
+										}
+									}
+								}
+								// All other errors (404, 403, network errors, etc.) are NOT CSP errors
+							}
+						};
+						
+						videoEl.addEventListener('error', handleDashVideoError);
+						
+						// Also try to detect CSP errors by checking if video fails to load after a delay
+						// Only check if we're using blob URLs (which CSP blocks)
+						const checkForDashCspError = setTimeout(() => {
+							if (replacementDashInstance.value && videoEl.error) {
+								const error = videoEl.error;
+								const errorMessage = error.message || '';
+								const videoSrc = videoEl.src || videoEl.getAttribute('src') || '';
+								
+								// ONLY treat as CSP if error code is 4 with "URL safety check" message
+								// Do NOT treat error code 2 (network errors like 404/403) as CSP
+								if (error.code === 4 && errorMessage.includes('URL safety check')) {
+									setReplacementCspError();
+								}
+							}
+						}, 2000);
+						
 						videoEl.addEventListener('loadedmetadata', () => {
+							clearTimeout(checkForDashCspError);
 							setTimeout(updateDashQuality, 300);
 						});
 						// Initial quality check with retries
@@ -227,6 +365,76 @@ export function useReplacementPlayer(
 							maxBufferLength: 3,
 							maxMaxBufferLength: 6,
 							maxBufferSize: 60 * 1000 * 1000
+						});
+						
+						// Error handler for video element errors (CSP detection ONLY)
+						const handleVideoError = (event: Event) => {
+							const error = (event.target as HTMLVideoElement)?.error;
+							if (error) {
+								// ONLY treat as CSP error if:
+								// Error code is 4 (MEDIA_ERR_SRC_NOT_SUPPORTED) AND
+								// Error message contains "URL safety check" (this is the SPECIFIC CSP indicator)
+								// Do NOT treat error code 2 (network errors like 404/403) as CSP
+								if (error.code === 4) {
+									const errorMessage = error.message || '';
+									// "URL safety check" is the specific message browsers show when CSP blocks blob URLs
+									if (errorMessage.includes('URL safety check')) {
+										if (replacementHlsInstance.value) {
+											setReplacementCspError();
+										}
+									}
+								}
+								// All other errors (404, 403, network errors, etc.) are NOT CSP errors
+							}
+						};
+						
+						videoEl.addEventListener('error', handleVideoError);
+						
+						// Also try to detect CSP errors by checking if video fails to load after a delay
+						// Only check if we're using blob URLs (which CSP blocks)
+						const checkForCspError = setTimeout(() => {
+							if (replacementHlsInstance.value && videoEl.error) {
+								const error = videoEl.error;
+								const errorMessage = error.message || '';
+								const videoSrc = videoEl.src || videoEl.getAttribute('src') || '';
+								
+								// ONLY treat as CSP if error code is 4 with "URL safety check" message
+								// Do NOT treat error code 2 (network errors like 404/403) as CSP
+								if (error.code === 4 && errorMessage.includes('URL safety check')) {
+									setReplacementCspError();
+								}
+							}
+						}, 2000);
+						
+						videoEl.addEventListener('loadedmetadata', () => {
+							clearTimeout(checkForCspError);
+						}, { once: true });
+						
+						// Listen for HLS.js errors
+						hls.on(Hls.Events.ERROR, (event: any, data: any) => {
+							if (data?.fatal) {
+								let errorMessage = '';
+								if (data.error) {
+									errorMessage = data.error.message || String(data.error);
+								} else if (data.details) {
+									errorMessage = data.details;
+								}
+								
+								// Only treat as CSP error if:
+								// 1. Error message explicitly mentions CSP or blob URL blocking
+								// 2. OR it's a network error AND the stream URL is a blob URL
+								const isNetworkError = data.type === Hls.ErrorTypes.NETWORK_ERROR;
+								const streamUrlIsBlob = streamUrl && streamUrl.startsWith('blob:');
+								const errorMessageIndicatesCsp = errorMessage.includes('blob') && errorMessage.includes('blocked');
+								
+								// Only set CSP error if we have clear evidence of CSP violation
+								if (errorMessageIndicatesCsp) {
+									setReplacementCspError();
+								} else if (isNetworkError && streamUrlIsBlob) {
+									// Network error with blob URL is likely CSP
+									setReplacementCspError();
+								}
+							}
 						});
 						
 						hls.loadSource(streamUrl);
@@ -314,9 +522,9 @@ export function useReplacementPlayer(
 		const labelParts: string[] = [];
 		if (useHls.value && streamUrl) {
 			// Stream mode: show DASH/HLS and quality labels
-			labelParts.push(`<span class="${isDash ? 'dash' : 'hls'}-label" style="background: var(--theme--primary, #6644ff); color: var(--white, #fff); padding: 2px 6px; border-radius: 4px; font-weight: 500; font-size: 11px;">${isDash ? 'DASH' : 'HLS'}</span>`);
+			labelParts.push(`<span class="${isDash ? 'dash' : 'hls'}-label" style="background: var(--theme--primary, #6644ff); color: var(--theme--foreground-inverse, #fff); padding: 2px 6px; border-radius: 4px; font-weight: 500; font-size: 11px;">${isDash ? 'DASH' : 'HLS'}</span>`);
 			if (replacementQuality.value) {
-				labelParts.push(`<span class="quality-label" style="background: var(--theme--primary, #6644ff); color: var(--white, #fff); padding: 2px 6px; border-radius: 4px; font-weight: 500; font-size: 11px;">${replacementQuality.value}</span>`);
+				labelParts.push(`<span class="quality-label" style="background: var(--theme--primary, #6644ff); color: var(--theme--foreground-inverse, #fff); padding: 2px 6px; border-radius: 4px; font-weight: 500; font-size: 11px;">${replacementQuality.value}</span>`);
 			}
 		}
 		const meta3Html = labelParts.length > 0 ? `<div class="meta" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">${labelParts.join('')}</div>` : '';
@@ -627,6 +835,44 @@ export function useReplacementPlayer(
 						}
 					}
 
+					// Error handler for video element errors (CSP detection ONLY)
+					const handleReplaceDashVideoError = (event: Event) => {
+						const error = (event.target as HTMLVideoElement)?.error;
+						if (error) {
+							// ONLY treat as CSP error if:
+							// Error code is 4 (MEDIA_ERR_SRC_NOT_SUPPORTED) AND
+							// Error message contains "URL safety check" (this is the SPECIFIC CSP indicator)
+							// Do NOT treat error code 2 (network errors like 404/403) as CSP
+							if (error.code === 4) {
+								const errorMessage = error.message || '';
+								// "URL safety check" is the specific message browsers show when CSP blocks blob URLs
+								if (errorMessage.includes('URL safety check')) {
+									if (replacementDashInstance.value) {
+										setReplacementCspError();
+									}
+								}
+							}
+							// All other errors (404, 403, network errors, etc.) are NOT CSP errors
+						}
+					};
+					
+					videoEl.addEventListener('error', handleReplaceDashVideoError);
+					
+					// Also try to detect CSP errors by checking if video fails to load after a delay
+					// Only check if we're using blob URLs (which CSP blocks)
+					const checkForReplaceDashCspError = setTimeout(() => {
+						if (replacementDashInstance.value && videoEl.error) {
+							const error = videoEl.error;
+							const errorMessage = error.message || '';
+							
+							// ONLY treat as CSP if error code is 4 with "URL safety check" message
+							// Do NOT treat error code 2 (network errors like 404/403) as CSP
+							if (error.code === 4 && errorMessage.includes('URL safety check')) {
+								setReplacementCspError();
+							}
+						}
+					}, 2000);
+					
 					// Initialize player
 					dashPlayer.initialize(videoEl, streamUrl, false);
 					
@@ -635,6 +881,7 @@ export function useReplacementPlayer(
 					
 					// Listen for video events to update quality
 					videoEl.addEventListener('loadedmetadata', () => {
+						clearTimeout(checkForReplaceDashCspError);
 						setTimeout(() => {
 							updateReplacementDashQuality();
 						}, 300);
@@ -672,6 +919,71 @@ export function useReplacementPlayer(
 					maxBufferLength: 3,
 					maxMaxBufferLength: 6,
 					maxBufferSize: 60 * 1000 * 1000
+				});
+				
+				// Error handler for video element errors (CSP detection ONLY)
+				const handleReplaceHlsVideoError = (event: Event) => {
+					const error = (event.target as HTMLVideoElement)?.error;
+					if (error) {
+						// ONLY treat as CSP error if:
+						// Error code is 4 (MEDIA_ERR_SRC_NOT_SUPPORTED) AND
+						// Error message contains "URL safety check" (this is the SPECIFIC CSP indicator)
+						// Do NOT treat error code 2 (network errors like 404/403) as CSP
+						if (error.code === 4) {
+							const errorMessage = error.message || '';
+							// "URL safety check" is the specific message browsers show when CSP blocks blob URLs
+							if (errorMessage.includes('URL safety check')) {
+								if (replacementHlsInstance.value) {
+									setReplacementCspError();
+								}
+							}
+						}
+						// All other errors (404, 403, network errors, etc.) are NOT CSP errors
+					}
+				};
+				
+				videoEl.addEventListener('error', handleReplaceHlsVideoError);
+				
+					// Also try to detect CSP errors by checking if video fails to load after a delay
+					// Only check if we're using blob URLs (which CSP blocks)
+					const checkForReplaceHlsCspError = setTimeout(() => {
+						if (replacementHlsInstance.value && videoEl.error) {
+							const error = videoEl.error;
+							const errorMessage = error.message || '';
+							
+							// ONLY treat as CSP if error code is 4 with "URL safety check" message
+							// Do NOT treat error code 2 (network errors like 404/403) as CSP
+							if (error.code === 4 && errorMessage.includes('URL safety check')) {
+								setReplacementCspError();
+							}
+						}
+					}, 2000);
+				
+				videoEl.addEventListener('loadedmetadata', () => {
+					clearTimeout(checkForReplaceHlsCspError);
+				}, { once: true });
+				
+				// Listen for HLS.js errors
+				hls.on(Hls.Events.ERROR, (event: any, data: any) => {
+					if (data?.fatal) {
+						let errorMessage = '';
+						if (data.error) {
+							errorMessage = data.error.message || String(data.error);
+						} else if (data.details) {
+							errorMessage = data.details;
+						}
+						
+						// ONLY treat as CSP error if error message explicitly mentions CSP blocking blob URLs
+						// Do NOT treat network errors (404, 403, etc.) as CSP
+						const errorMessageIndicatesCsp = isCspError(errorMessage) || 
+							(errorMessage.includes('blob') && errorMessage.includes('blocked') && errorMessage.includes('Content Security Policy'));
+						
+						// Only set CSP error if we have clear evidence of CSP violation
+						if (errorMessageIndicatesCsp) {
+							setReplacementCspError();
+						}
+						// All other errors (404, 403, network errors, etc.) are NOT CSP errors
+					}
 				});
 				
 				hls.loadSource(streamUrl);
@@ -827,6 +1139,7 @@ export function useReplacementPlayer(
 		currentFileId,
 		currentFileType,
 		mp4Url,
+		replacementCspError,
 		replaceDefaultVideoPlayer,
 		updateReplacementPlayer,
 		cleanupReplacementPlayer,
