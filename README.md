@@ -12,7 +12,7 @@ This extension adds a video player interface to Directus allowing you to play vi
 
 - **Videos in Items**: Play videos on collection items detail page
 - **Adaptive Streaming**: Play adaptive HLS (m3u8) and MPEG-DASH (mpd) video streams
-- **Quality Labels**: Display current stream quality (e.g., 720p, 1080p, 4K) for both HLS and DASH streams
+- **Quality Labels**: Displays current stream quality (e.g., 720p, 1080p, 4K) for both HLS and DASH streams
 - **Standard Videos**: Support for MP4 and other standard video formats
 - **File Upload**: Uses Directus native drag & drop upload component known from default image interface
 - **File Module Integration**: HLS and DASH streaming on Directus file detail pages (with custom field)
@@ -67,7 +67,7 @@ Use this interface on string fields to play HLS or MPEG-DASH stream links:
 1. Go to your collection settings
 2. Select a string field
 3. Set the interface to **Streaming Video Player**
-4. In collection item view: Enter stream paths for local origin resources (e.g., `/assets/:UUID`) or full URLs for remote/other resources
+4. In collection item view: Enter stream paths for local resources you get at the Directus **assets** endpoint (e.g., `/assets/:uuid`) or full URLs for remote/other resources
    - **HLS streams**: URLs ending in `.m3u8` (e.g., `https://example.com/video.m3u8`)
    - **DASH streams**: URLs ending in `.mpd` (e.g., `https://example.com/video.mpd`)
 
@@ -78,18 +78,18 @@ Use this interface on string fields to play HLS or MPEG-DASH stream links:
 
 ### Directus Files
 
-Use this interface on file fields to play uploaded video files:
+Use this interface on file fields to play uploaded video files in **collection item detail view**:
 
 1. Go to your collection settings
 2. Select a file field (UUID type)
 3. Set the interface to **Streaming Video Player**
 4. In collection item view: Upload or select video file
 
-The player supports MP4 and other standard video formats.
+The player will now play the standard video source file. If you have a custom string field in `directus_files` with an additional stream link to your source file, you can configure this in **Stream Link Field Name** and the player will use the relational file stream instead of the source file.
 
 ### File Module Integration
 
-When applied to a custom string field in `directus_files`, this extension will replace the default video player in the file detail page and prefer playing the HLS or DASH stream:
+When applied directly on a custom string field in `directus_files`, this extension will replace the default video player in the **file lib detail view** and prefer playing the HLS or DASH stream:
 
 1. Add a string field to `directus_files` (e.g., `stream_link`)
 2. Set the interface to **Streaming Video Player**
