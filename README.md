@@ -52,8 +52,9 @@ directus/extensions/directus-extension-streaming-video-player/
 
 4. Restart your Directus instance
 
-### Update CSP
-To make HLS/DASH Streaming work, update your CSP directives as follows:
+
+### **⚠️ Important:** Update CSP
+To make HLS/DASH streaming work, update your CSP directives as follows:
 ```env
 CONTENT_SECURITY_POLICY_DIRECTIVES__MEDIA_SRC=array:'self', blob: data:
 ```
