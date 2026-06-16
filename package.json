@@ -2,7 +2,7 @@
 	"name": "directus-extension-streaming-video-player",
 	"description": "Play HLS and MPEG-DASH adaptive video streams and standard video files with this enhanced video player interface",
 	"icon": "play_circle",
-	"version": "1.0.8",
+	"version": "1.0.9",
 	"license": "MIT",
 	"keywords": [
 		"directus",
@@ -11,6 +11,7 @@
 		"video",
 		"player",
 		"hls",
+		"dash",
 		"streaming"
 	],
 	"type": "module",
