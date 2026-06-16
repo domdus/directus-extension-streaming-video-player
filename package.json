@@ -18,7 +18,7 @@
 		"type": "interface",
 		"path": "dist/index.js",
 		"source": "src/index.ts",
-		"host": "^11.0.0"
+		"host": "^12.0.0"
 	},
 	"repository": {
 		"type": "git",
@@ -34,13 +34,13 @@
 		"link": "directus-extension link"
 	},
 	"devDependencies": {
-		"@directus/extensions-sdk": "^17.0.0",
-		"vue": "^3.3.7",
-		"typescript": "^5.0.0"
+		"@directus/extensions-sdk": "^18.0.0",
+		"typescript": "^5.0.0",
+		"vue": "^3.3.7"
 	},
 	"dependencies": {
-		"hls.js": "^1.4.12",
+		"crypto-js": "^4.2.0",
 		"dashjs": "^4.7.4",
-		"crypto-js": "^4.2.0"
+		"hls.js": "^1.4.12"
 	}
 }
