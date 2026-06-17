@@ -12,41 +12,33 @@
 				Your browser does not support the video tag.
 			</video>
 			<div class="shadow"></div>
-			<div class="actions">
+			<OverlayActions :is-v12="isDirectusV12">
 				<v-button
+					v-bind="overlayActionButtonProps"
 					v-tooltip="isPlaying ? 'Pause' : 'Play'"
-					rounded
-					icon
-					secondary
 					@click="togglePlayPause"
 				>
 					<v-icon :name="isPlaying ? 'pause' : 'play_arrow'" />
 				</v-button>
 				<v-button
+					v-bind="overlayActionButtonProps"
 					v-tooltip="'Fullscreen'"
-					rounded
-					icon
-					secondary
 					@click="$emit('fullscreen')"
 				>
 					<v-icon name="zoom_in" />
 				</v-button>
 				<v-button
 					v-if="showEdit"
+					v-bind="overlayActionButtonProps"
 					v-tooltip="'Edit'"
-					rounded
-					icon
-					secondary
 					@click="$emit('edit')"
 				>
 					<v-icon name="edit" />
 				</v-button>
 				<v-button
 					v-if="showDownload"
+					v-bind="overlayActionButtonProps"
 					v-tooltip="'Download'"
-					rounded
-					icon
-					secondary
 					:href="downloadUrl"
 					:download="downloadFilename"
 				>
@@ -54,15 +46,13 @@
 				</v-button>
 				<v-button
 					v-if="showClear"
+					v-bind="overlayActionButtonProps"
 					v-tooltip="'Clear'"
-					rounded
-					icon
-					secondary
 					@click="$emit('clear')"
 				>
 					<v-icon name="close" />
 				</v-button>
-			</div>
+			</OverlayActions>
 			<div v-if="showInfo" class="info">
 				<div class="title">{{ title }}</div>
 				<div class="meta">
@@ -79,6 +69,10 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue';
+import { useOverlayActionButtonProps } from '../composables/useOverlayActionButtonProps';
+import OverlayActions from './OverlayActions.vue';
+
+const { isDirectusV12, overlayActionButtonProps } = useOverlayActionButtonProps();
 
 interface Props {
 	showPlayer: boolean;
@@ -175,10 +169,16 @@ defineExpose({
 	border-radius: var(--theme--border-radius);
 }
 
-.video-preview:hover .actions,
-.video-preview:hover .info {
+.video-preview:hover .info,
+.video-preview:focus-within .info {
 	opacity: 1;
 	visibility: visible;
+}
+
+.video-preview:hover .overlay-actions :deep(.v-button),
+.video-preview:focus-within .overlay-actions :deep(.v-button) {
+	transform: translateY(0);
+	opacity: 1;
 }
 
 .video-container {
@@ -197,40 +197,6 @@ defineExpose({
 	background: linear-gradient(to bottom, rgba(0, 0, 0, 0.3) 0%, transparent 30%, transparent 70%, rgba(0, 0, 0, 0.3) 100%);
 	pointer-events: none;
 	z-index: 1;
-}
-
-.actions {
-	--v-button-color: var(--theme--form--field--input--foreground-subdued);
-	--v-button-background-color: var(--white);
-	--v-button-color-hover: var(--theme--form--field--input--foreground);
-	--v-button-background-color-hover: var(--white);
-	
-	position: absolute;
-	inset-block-start: calc(50% - 32px);
-	inset-inline-start: 0;
-	z-index: 3;
-	display: flex;
-	justify-content: center;
-	inline-size: 100%;
-	gap: 12px;
-	
-	opacity: 0;
-	visibility: hidden;
-	transition: opacity 0.2s ease, visibility 0.2s ease;
-}
-
-.actions :deep(.v-button) {
-	--v-button-background-color: var(--white) !important;
-	--v-button-color: var(--theme--form--field--input--foreground-subdued) !important;
-	background-color: var(--white) !important;
-	border-color: var(--white) !important;
-}
-
-.actions :deep(.v-button:hover) {
-	--v-button-background-color-hover: var(--white) !important;
-	--v-button-color-hover: var(--theme--form--field--input--foreground) !important;
-	background-color: var(--white) !important;
-	border-color: var(--white) !important;
 }
 
 .info {
