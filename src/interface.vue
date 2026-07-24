@@ -147,8 +147,8 @@ let srcCheckTimeout: ReturnType<typeof setTimeout> | null = null;
 // Composables
 const { fileData, loading, loadFileData, clearFileData } = useFileData();
 const { inputOptions, inputPlaceholder, processValue } = useInputOptions(attrs);
-const { hlsInstance, playEventListener, currentQuality: hlsQuality, cspError: hlsCspError, setupHlsPlayer, cleanupHls } = useHlsPlayer(videoElement);
-const { dashInstance, currentQuality: dashQuality, cspError: dashCspError, setupDashPlayer, cleanupDash } = useDashPlayer(videoElement);
+const { hlsInstance, playEventListener, currentQuality: hlsQuality, cspError: hlsCspError, setupHlsPlayer, cleanupHls } = useHlsPlayer(videoElement, api);
+const { dashInstance, currentQuality: dashQuality, cspError: dashCspError, setupDashPlayer, cleanupDash } = useDashPlayer(videoElement, api);
 
 // Combine CSP errors from both HLS and DASH players
 const cspError = computed(() => hlsCspError.value || dashCspError.value);
@@ -194,7 +194,8 @@ const {
 	streamLinkFieldName,
 	getStreamUrl,
 	apiBaseUrl,
-	values
+	values,
+	api
 );
 
 // String field handlers
@@ -250,7 +251,8 @@ const {
 	fileData,
 	streamLinkFieldName,
 	getStreamUrl,
-	videoUrl
+	videoUrl,
+	api
 );
 
 // Sync videoElement from child components - ONLY for regular interface cases (not replacement player)

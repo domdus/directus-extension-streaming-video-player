@@ -3,7 +3,7 @@
  */
 import { computed } from 'vue';
 import CryptoJS from 'crypto-js';
-import { normalizeApiBaseUrl } from '../utils';
+import { addAccessTokenToUrl, getAccessToken, normalizeApiBaseUrl } from '../utils';
 
 interface StreamUrlOptions {
 	hostUrl?: string;
@@ -47,13 +47,26 @@ function generateSecurePathHash(
 export function useStreamUrl(options: StreamUrlOptions) {
 	const apiBaseUrl = computed(() => normalizeApiBaseUrl(options.api));
 
+	const finalizeStreamUrl = (url: string | null): string | null => {
+		// Only append Directus session access_token for same-origin /assets/ URLs.
+		// External CDNs (Cloudflare Stream, etc.) are left untouched unless {{access_token}} was in the schema.
+		return addAccessTokenToUrl(url, options.api) ?? url;
+	};
+
+	const replaceAccessTokenPlaceholder = (template: string): string => {
+		if (!template.includes('{{access_token}}')) return template;
+		const accessToken = getAccessToken(options.api) || '';
+		return template.replace(/\{\{access_token\}\}/g, accessToken);
+	};
+
 	const getStreamUrl = (streamLink: string): string | null => {
 		if (!streamLink) return null;
 
 		// If streamLink is already a fully qualified URL (http:// or https://), return it directly
-		// This allows external HLS streams (e.g., Cloudflare Stream) to work without hostUrl/secret configuration
+		// This allows external HLS streams (e.g., Cloudflare Stream) to work without hostUrl/secret configuration.
+		// Same-origin Directus /assets/ URLs still get access_token via finalizeStreamUrl.
 		if (streamLink.startsWith('http://') || streamLink.startsWith('https://')) {
-			return streamLink;
+			return finalizeStreamUrl(streamLink);
 		}
 		
 		try {
@@ -97,6 +110,9 @@ export function useStreamUrl(options: StreamUrlOptions) {
 				
 				// Replace {{host_url}} placeholder
 				urlSchema = urlSchema.replace(/\{\{host_url\}\}/g, hostUrl);
+
+				// Directus Studio session token (optional; distinct from stream-secret {{token}})
+				urlSchema = replaceAccessTokenPlaceholder(urlSchema);
 				
 				// Check for other placeholders
 				const hasTokenPlaceholder = urlSchema.includes('{{token}}');
@@ -137,11 +153,11 @@ export function useStreamUrl(options: StreamUrlOptions) {
 				if (!hasItemPlaceholder) {
 					// Ensure proper path separator
 					const separator = urlSchema.endsWith('/') ? '' : '/';
-					return urlSchema + separator + normalizedStreamLink;
+					return finalizeStreamUrl(urlSchema + separator + normalizedStreamLink);
 				}
 				
 				// {{item_field}} was replaced, return the schema as-is
-				return urlSchema;
+				return finalizeStreamUrl(urlSchema);
 			}
 			
 			// Fallback to old behavior (backward compatibility)
@@ -175,7 +191,8 @@ export function useStreamUrl(options: StreamUrlOptions) {
 			}
 			
 			// Check if template placeholders exist FIRST - only add token/expires if placeholders are present
-			// Support {{token}}, {{expires}}, and {{item_field}} placeholders in hostUrl
+			// Support {{token}}, {{expires}}, {{item_field}}, {{access_token}} placeholders in hostUrl
+			hostUrlTemplate = replaceAccessTokenPlaceholder(hostUrlTemplate);
 			const hasTokenPlaceholder = hostUrlTemplate.includes('{{token}}');
 			const hasExpiresPlaceholder = hostUrlTemplate.includes('{{expires}}');
 			const hasItemPlaceholder = hostUrlTemplate.includes('{{item_field}}');
@@ -197,9 +214,9 @@ export function useStreamUrl(options: StreamUrlOptions) {
 					const cleanHost = normalizedHost.replace(/\/+$/, '');
 					// If {{item_field}} was not in template, append streamLink
 					if (!hasItemPlaceholder) {
-						return cleanHost + streamLink;
+						return finalizeStreamUrl(cleanHost + streamLink);
 					}
-					return cleanHost;
+					return finalizeStreamUrl(cleanHost);
 				}
 				
 				// If we have token/expires placeholders, generate and replace them
@@ -231,18 +248,18 @@ export function useStreamUrl(options: StreamUrlOptions) {
 				
 				// If {{item_field}} was not in template, append streamLink
 				if (!hasItemPlaceholder) {
-					return streamUrl + streamLink;
+					return finalizeStreamUrl(streamUrl + streamLink);
 				}
 				
 				// {{item_field}} was replaced, return as-is
-				return streamUrl;
+				return finalizeStreamUrl(streamUrl);
 			} else {
 				// No template syntax - just append streamLink
-				return hostUrlTemplate + streamLink;
+				return finalizeStreamUrl(hostUrlTemplate + streamLink);
 			}
 		} catch (error) {
 			console.error('Failed to construct stream URL:', error);
-			return `${window.location.origin}${streamLink}`;
+			return finalizeStreamUrl(`${window.location.origin}${streamLink}`);
 		}
 	};
 

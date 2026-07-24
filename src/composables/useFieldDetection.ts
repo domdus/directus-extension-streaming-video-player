@@ -2,7 +2,7 @@
  * Composable for field type detection and related computed properties
  */
 import { computed, type ComputedRef } from 'vue';
-import { useAttrs } from 'vue';
+import { addAccessTokenToUrl } from '../utils';
 import type { useFileData } from './useFileData';
 import type { useStreamUrl } from './useStreamUrl';
 
@@ -13,7 +13,8 @@ export function useFieldDetection(
 	streamLinkFieldName: ComputedRef<string>,
 	getStreamUrl: (streamLink: string) => string | null,
 	apiBaseUrl: ComputedRef<string>,
-	values: any
+	values: any,
+	api: any
 ) {
 	// Detect if this is a string field (not a file field)
 	const isStringField = computed(() => {
@@ -149,7 +150,7 @@ export function useFieldDetection(
 			
 			if (fileId) {
 				const baseUrl = apiBaseUrl.value.endsWith('/') ? apiBaseUrl.value.slice(0, -1) : apiBaseUrl.value;
-				return `${baseUrl}/assets/${fileId}`;
+				return addAccessTokenToUrl(`${baseUrl}/assets/${fileId}`, api);
 			}
 		}
 		
@@ -196,11 +197,11 @@ export function useFieldDetection(
 		if (typeof posterValue === 'string') {
 			// Check if it's a full URL (starts with http:// or https://)
 			if (posterValue.startsWith('http://') || posterValue.startsWith('https://')) {
-				return posterValue;
+				return addAccessTokenToUrl(posterValue, api);
 			}
 			// Otherwise, treat it as a file ID (UUID)
 			const baseUrl = apiBaseUrl.value.endsWith('/') ? apiBaseUrl.value.slice(0, -1) : apiBaseUrl.value;
-			return `${baseUrl}/assets/${posterValue}?key=system-large-cover`;
+			return addAccessTokenToUrl(`${baseUrl}/assets/${posterValue}?key=system-large-cover`, api);
 		}
 		
 		// If it's an object, try to get the id property (file field)
@@ -208,7 +209,7 @@ export function useFieldDetection(
 		if (imageId) {
 			// Ensure we have a full URL - apiBaseUrl already includes protocol and host
 			const baseUrl = apiBaseUrl.value.endsWith('/') ? apiBaseUrl.value.slice(0, -1) : apiBaseUrl.value;
-			return `${baseUrl}/assets/${imageId}?key=system-large-cover`;
+			return addAccessTokenToUrl(`${baseUrl}/assets/${imageId}?key=system-large-cover`, api);
 		}
 		
 		return null;
@@ -218,14 +219,14 @@ export function useFieldDetection(
 		if (!fileData.value?.id) return null;
 		// Ensure we have a full URL - apiBaseUrl already includes protocol and host
 		const baseUrl = apiBaseUrl.value.endsWith('/') ? apiBaseUrl.value.slice(0, -1) : apiBaseUrl.value;
-		return `${baseUrl}/assets/${fileData.value.id}`;
+		return addAccessTokenToUrl(`${baseUrl}/assets/${fileData.value.id}`, api);
 	});
 
 	const downloadUrl = computed(() => {
 		if (!fileData.value?.id) return null;
 		// Ensure we have a full URL - apiBaseUrl already includes protocol and host
 		const baseUrl = apiBaseUrl.value.endsWith('/') ? apiBaseUrl.value.slice(0, -1) : apiBaseUrl.value;
-		return `${baseUrl}/assets/${fileData.value.id}?download=`;
+		return addAccessTokenToUrl(`${baseUrl}/assets/${fileData.value.id}?download=`, api);
 	});
 
 	// Get folder from attrs or options

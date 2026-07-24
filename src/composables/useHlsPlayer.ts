@@ -3,6 +3,7 @@
  */
 import { ref, type Ref } from 'vue';
 import Hls from 'hls.js';
+import { addAccessTokenToUrl, hlsXhrSetup } from '../utils';
 
 export interface HlsPlayerInstance {
 	hlsInstance: Ref<Hls | null>;
@@ -113,7 +114,7 @@ function setupConsoleErrorInterceptor() {
 	};
 }
 
-export function useHlsPlayer(videoElement: Ref<HTMLVideoElement | null>): HlsPlayerInstance {
+export function useHlsPlayer(videoElement: Ref<HTMLVideoElement | null>, api?: any): HlsPlayerInstance {
 	const hlsInstance = ref<Hls | null>(null);
 	const playEventListener = ref<(() => void) | null>(null);
 	const currentQuality = ref<string | null>(null);
@@ -155,6 +156,8 @@ export function useHlsPlayer(videoElement: Ref<HTMLVideoElement | null>): HlsPla
 	}
 
 	const setupHlsPlayer = (videoEl: HTMLVideoElement, streamUrl: string, fallback?: () => void) => {
+		streamUrl = addAccessTokenToUrl(streamUrl, api) || streamUrl;
+
 		// Reset CSP error when setting up a new player
 		if (videoEl === videoElement.value) {
 			cspError.value = null;
@@ -217,7 +220,8 @@ export function useHlsPlayer(videoElement: Ref<HTMLVideoElement | null>): HlsPla
 				autoStartLoad: true, // False: Don't start loading until user clicks play
 				maxBufferLength: 3, // Maximum buffer length in seconds (limits preloading)
 				maxMaxBufferLength: 6, // Maximum max buffer length
-				maxBufferSize: 60 * 1000 * 1000 // Maximum buffer size in bytes (60MB)
+				maxBufferSize: 60 * 1000 * 1000, // Maximum buffer size in bytes (60MB)
+				...(api ? { xhrSetup: hlsXhrSetup(api) } : {})
 			});
 			
 			// Listen for HLS.js errors

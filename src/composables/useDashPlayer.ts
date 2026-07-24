@@ -3,6 +3,7 @@
  */
 import { ref, type Ref, watch } from 'vue';
 import * as dashjs from 'dashjs';
+import { addAccessTokenToUrl, applyDashAccessToken } from '../utils';
 
 export interface DashPlayerInstance {
 	dashInstance: Ref<dashjs.MediaPlayerClass | null>;
@@ -49,7 +50,7 @@ export function isDashStream(url: string): boolean {
 // We need to import the setup function and callback registry from useHlsPlayer
 // Actually, let's create a shared approach - DASH will also detect CSP errors via video element errors
 
-export function useDashPlayer(videoElement: Ref<HTMLVideoElement | null>): DashPlayerInstance {
+export function useDashPlayer(videoElement: Ref<HTMLVideoElement | null>, api?: any): DashPlayerInstance {
 	const dashInstance = ref<dashjs.MediaPlayerClass | null>(null);
 	const currentQuality = ref<string | null>(null);
 	const cspError = ref<string | null>(null);
@@ -68,6 +69,8 @@ export function useDashPlayer(videoElement: Ref<HTMLVideoElement | null>): DashP
 	
 
 		const setupDashPlayer = (videoEl: HTMLVideoElement, streamUrl: string, fallback?: () => void) => {
+			streamUrl = addAccessTokenToUrl(streamUrl, api) || streamUrl;
+
 			if (!streamUrl) {
 				if (fallback) fallback();
 				return;
@@ -93,6 +96,10 @@ export function useDashPlayer(videoElement: Ref<HTMLVideoElement | null>): DashP
 			try {
 				// Create DASH player instance
 				const player = dashjs.MediaPlayer().create();
+
+				if (api) {
+					applyDashAccessToken(player, api);
+				}
 			
 			// Configure player settings (removed deprecated maxBufferLength settings)
 			player.updateSettings({

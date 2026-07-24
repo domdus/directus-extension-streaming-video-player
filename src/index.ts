@@ -211,7 +211,7 @@ export default defineInterface({
 					options: {
 						placeholder: '{{host_url}}{{item_field}}'
 					},
-					note: 'Optional: URL template with mustache syntax placeholders: {{host_url}}, {{token}}, {{expires}}, {{item_field}}. Example: {{host_url}}/{{token}}/{{expires}}{{item_field}}',
+					note: 'Optional: URL template with mustache syntax placeholders: {{host_url}}, {{token}}, {{expires}}, {{item_field}}, {{access_token}}. Example: {{host_url}}/{{token}}/{{expires}}{{item_field}}. Use {{access_token}} for the Directus session JWT when needed; same-origin /assets/ URLs also get it automatically.',
 					conditions: [
 						{
 							name: 'Hide when stream_secret is empty',
@@ -407,7 +407,7 @@ export default defineInterface({
 				options: {
 					placeholder: '{{host_url}}{{item_field}}'
 				},
-				note: 'Optional: URL template with mustache syntax placeholders: {{host_url}}, {{token}}, {{expires}}, {{item_field}}. Example: {{host_url}}/stream/{{token}}/{{expires}}{{item_field}}',
+				note: 'Optional: URL template with mustache syntax placeholders: {{host_url}}, {{token}}, {{expires}}, {{item_field}}, {{access_token}}. Example: {{host_url}}/stream/{{token}}/{{expires}}{{item_field}}. Use {{access_token}} for the Directus session JWT when needed; same-origin /assets/ URLs also get it automatically.',
 				conditions: [
 					{
 						name: 'Hide when stream_secret is empty',

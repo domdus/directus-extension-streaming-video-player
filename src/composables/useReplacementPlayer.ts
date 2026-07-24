@@ -4,7 +4,7 @@
 import { ref, type Ref } from 'vue';
 import Hls from 'hls.js';
 import * as dashjs from 'dashjs';
-import { getFileIdFromContext, formatFileSize } from '../utils';
+import { getFileIdFromContext, formatFileSize, hlsXhrSetup, applyDashAccessToken, addAccessTokenToUrl, getAccessToken } from '../utils';
 import type { useApi } from '@directus/extensions-sdk';
 import { isDashStream } from './useDashPlayer';
 
@@ -38,6 +38,8 @@ export function useReplacementPlayer(
 	const replacementDashInstance = ref<dashjs.MediaPlayerClass | null>(null);
 	const replacementQuality = ref<string | null>(null);
 	const replacementCspError = ref<string | null>(null);
+
+	const authedMediaUrl = (url: string | null | undefined) => addAccessTokenToUrl(url, api) || url || null;
 	const currentFileId = ref<string | null>(null);
 	const currentFileType = ref<string | null>(null);
 	const currentFileData = ref<any>(null);
@@ -182,7 +184,7 @@ export function useReplacementPlayer(
 		
 		if (useHls.value) {
 			// Switch to streaming format (HLS or DASH)
-			const streamUrl = streamUrlFromValue.value;
+			const streamUrl = authedMediaUrl(streamUrlFromValue.value);
 			if (streamUrl && replacementVideoElement.value) {
 				const videoEl = replacementVideoElement.value;
 				
@@ -190,6 +192,7 @@ export function useReplacementPlayer(
 					// Create DASH instance with quality tracking
 					try {
 						const dashPlayer = dashjs.MediaPlayer().create();
+						applyDashAccessToken(dashPlayer, api);
 						dashPlayer.updateSettings({
 							streaming: {
 								buffer: {
@@ -364,7 +367,8 @@ export function useReplacementPlayer(
 							autoStartLoad: true,
 							maxBufferLength: 3,
 							maxMaxBufferLength: 6,
-							maxBufferSize: 60 * 1000 * 1000
+							maxBufferSize: 60 * 1000 * 1000,
+							xhrSetup: hlsXhrSetup(api)
 						});
 						
 						// Error handler for video element errors (CSP detection ONLY)
@@ -476,7 +480,9 @@ export function useReplacementPlayer(
 			// Switch to File
 			const mp4 = mp4Url.value;
 			if (mp4) {
-				replacementVideoElement.value.src = mp4;
+				cleanupHls();
+				cleanupDash();
+				replacementVideoElement.value.src = authedMediaUrl(mp4) || mp4;
 				replacementVideoElement.value.load();
 			}
 		}
@@ -649,10 +655,10 @@ export function useReplacementPlayer(
 			}
 			
 			// Get the stream URL
-			const streamUrl = streamUrlFromValue.value;
+			const streamUrl = authedMediaUrl(streamUrlFromValue.value);
 			if (!streamUrl) {
 				// If no stream URL, try to use MP4 directly
-				const mp4 = mp4Url.value;
+				const mp4 = authedMediaUrl(mp4Url.value);
 				if (mp4 && !useHls.value) {
 					// Store reference to the original video element
 					replacementVideoElement.value = defaultVideo as HTMLVideoElement;
@@ -670,6 +676,9 @@ export function useReplacementPlayer(
 			// Mark as replaced
 			defaultVideo.dataset.replacedByHls = 'true';
 			
+			// Capture Directus preview token BEFORE clearing (file-preview has access_token)
+			getAccessToken(api);
+
 			// Clear the src to stop loading
 			defaultVideo.src = '';
 			defaultVideo.removeAttribute('src');
@@ -719,6 +728,7 @@ export function useReplacementPlayer(
 				// Create DASH instance for replacement player to track quality
 				try {
 					const dashPlayer = dashjs.MediaPlayer().create();
+					applyDashAccessToken(dashPlayer, api);
 					
 					// Configure player settings
 					dashPlayer.updateSettings({
@@ -918,7 +928,8 @@ export function useReplacementPlayer(
 					autoStartLoad: true,
 					maxBufferLength: 3,
 					maxMaxBufferLength: 6,
-					maxBufferSize: 60 * 1000 * 1000
+					maxBufferSize: 60 * 1000 * 1000,
+					xhrSetup: hlsXhrSetup(api)
 				});
 				
 				// Error handler for video element errors (CSP detection ONLY)
