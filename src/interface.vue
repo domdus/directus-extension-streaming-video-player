@@ -46,6 +46,7 @@
 			:enable-create-value="enableCreateValue"
 			:enable-select-value="enableSelectValue"
 			:folder="folder"
+			:storage="storage"
 			:custom-filter="customFilter"
 			@upload="onUpload"
 			@loaded="onVideoLoaded"
@@ -100,6 +101,7 @@ const props = withDefaults(
 		fieldMeta?: any;
 		item?: any;
 		folder?: string;
+		storage?: string;
 		filter?: any;
 		enableCreate?: boolean;
 		enableSelect?: boolean;
@@ -183,6 +185,7 @@ const {
 	videoUrl,
 	downloadUrl,
 	folder,
+	storage,
 	enableSelectValue,
 	enableCreateValue,
 	createAllowed,

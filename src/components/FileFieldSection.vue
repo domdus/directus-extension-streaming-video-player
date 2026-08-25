@@ -7,6 +7,7 @@
 				:from-user="createAllowed && enableCreateValue"
 				:from-library="enableSelectValue"
 				:folder="folder"
+				:preset="uploadPreset"
 				:filter="customFilter"
 				@input="$emit('upload', $event)"
 			/>
@@ -135,10 +136,16 @@ interface Props {
 	enableCreateValue: boolean;
 	enableSelectValue: boolean;
 	folder: string | null;
+	storage?: string;
 	customFilter: any;
 }
 
 const props = defineProps<Props>();
+
+const uploadPreset = computed(() => {
+	const storage = String(props.storage || '').trim();
+	return storage ? { storage } : {};
+});
 
 defineEmits<{
 	upload: [fileInfo: any];

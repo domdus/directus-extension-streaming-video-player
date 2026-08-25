@@ -234,6 +234,14 @@ export function useFieldDetection(
 		return (attrs.folder as string) || props.folder || null;
 	});
 
+	const storage = computed(() => {
+		const fromAttrs = attrs.storage as string | undefined;
+		const fromProps = props.storage;
+		const raw = fromAttrs ?? fromProps;
+		if (raw == null || raw === '') return '';
+		return String(raw).trim();
+	});
+
 	// Get enableSelect and enableCreate from attrs or props
 	const enableSelectValue = computed(() => {
 		const fromAttrs = attrs.enableSelect as boolean | undefined;
@@ -270,6 +278,7 @@ export function useFieldDetection(
 		videoUrl,
 		downloadUrl,
 		folder,
+		storage,
 		enableSelectValue,
 		enableCreateValue,
 		createAllowed,

@@ -654,10 +654,24 @@ export default defineInterface({
 				name: '$t:interfaces.system-folder.folder',
 				type: 'uuid',
 				meta: {
-					width: 'full',
+					width: 'half',
 					interface: 'system-folder',
 					group: 'field_options',
 					note: '$t:interfaces.system-folder.field_hint',
+				},
+			},
+			{
+				field: 'storage',
+				name: 'Storage Location',
+				type: 'string',
+				meta: {
+					width: 'half',
+					interface: 'input',
+					group: 'field_options',
+					options: {
+						placeholder: 'Default storage',
+					},
+					note: 'Optional. Leave empty to use the project default storage adapter.',
 				},
 			},
 			{

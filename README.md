@@ -15,6 +15,7 @@ This extension adds a video player interface to Directus allowing you to play vi
 - **Quality Labels**: Displays current stream quality (e.g., 720p, 1080p, 4K) for both HLS and DASH streams
 - **Standard Videos**: Support for MP4 and other standard video formats
 - **File Upload**: Uses Directus native drag & drop upload component known from default image interface
+- **Storage Location**: Optional field option to target a specific storage adapter on upload (empty = project default)
 - **File Module Integration**: HLS and DASH streaming on Directus file detail pages (with custom field)
 - **Keeps Native Interface Options**:
   - Default upload folder & filter for files
@@ -103,6 +104,7 @@ When applied directly on a custom string field in `directus_files`, this extensi
 ## Configuration
 
 - **Poster Image Field Name**: Name of the field that contains a poster/thumbnail image for player. It must be a file field (image) for uploaded images or a string field containing a full image URL.
+- **Storage Location**: (File field only) Optional storage adapter for new uploads (e.g. `local`, `s3`). Leave empty to use the project default.
 - **Stream Link Field Name**: (File field only) Name of a custom field in relational `directus_files` that contains the stream link. This enables the player to play the relational file HLS stream on a collection item detail page, instead of playing the source video file.
 
 ### Streaming Configuration 
