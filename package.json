@@ -21,6 +21,11 @@
 		"source": "src/index.ts",
 		"host": ">=9.26.0 <13.0.0"
 	},
+	"files": [
+		"dist",
+		"LICENSE",
+		"README.md"
+	],
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/domdus/directus-extension-streaming-video-player.git"
