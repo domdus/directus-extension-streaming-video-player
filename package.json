@@ -2,7 +2,7 @@
 	"name": "directus-extension-streaming-video-player",
 	"description": "Play HLS and MPEG-DASH adaptive video streams and standard video files with this enhanced video player interface",
 	"icon": "play_circle",
-	"version": "1.0.13",
+	"version": "1.0.14",
 	"license": "MIT",
 	"keywords": [
 		"directus",
@@ -32,10 +32,15 @@
 	"scripts": {
 		"build": "directus-extension build",
 		"dev": "directus-extension build -w --no-minify",
-		"link": "directus-extension link"
+		"link": "directus-extension link",
+		"test": "tsx --test \"src/**/*.test.ts\"",
+		"typecheck": "tsc --noEmit -p ."
 	},
 	"devDependencies": {
 		"@directus/extensions-sdk": "^18.0.0",
+		"@types/crypto-js": "^4.2.2",
+		"@types/node": "^20.19.43",
+		"tsx": "^4.23.15",
 		"typescript": "^5.0.0",
 		"vue": "^3.3.7"
 	},

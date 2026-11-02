@@ -4,7 +4,7 @@
 import { ref, type Ref } from 'vue';
 import Hls from 'hls.js';
 import * as dashjs from 'dashjs';
-import { getFileIdFromContext, formatFileSize, hlsXhrSetup, applyDashAccessToken, addAccessTokenToUrl, getAccessToken } from '../utils';
+import { escapeHtml, getFileIdFromContext, formatFileSize, hlsXhrSetup, applyDashAccessToken, addAccessTokenToUrl, getAccessToken } from '../utils';
 import type { useApi } from '@directus/extensions-sdk';
 import { isDashStream } from './useDashPlayer';
 
@@ -480,8 +480,7 @@ export function useReplacementPlayer(
 			// Switch to File
 			const mp4 = mp4Url.value;
 			if (mp4) {
-				cleanupHls();
-				cleanupDash();
+				destroyStreamingInstances();
 				replacementVideoElement.value.src = authedMediaUrl(mp4) || mp4;
 				replacementVideoElement.value.load();
 			}
@@ -489,6 +488,22 @@ export function useReplacementPlayer(
 		
 		// Update info overlay
 		updateReplacementPlayerInfo();
+	};
+
+	const destroyStreamingInstances = () => {
+		if (replacementHlsInstance.value) {
+			replacementHlsInstance.value.destroy();
+			replacementHlsInstance.value = null;
+		}
+		if (replacementDashInstance.value) {
+			try {
+				replacementDashInstance.value.reset();
+				replacementDashInstance.value.destroy();
+			} catch {
+				// dash.js can throw when the source is already gone
+			}
+			replacementDashInstance.value = null;
+		}
 	};
 
 	// Update info overlay content
@@ -504,7 +519,7 @@ export function useReplacementPlayer(
 		const isDash = streamUrl ? isDashStream(streamUrl) : false;
 		
 		// Title: filename_download or id
-		const title = fileData ? (fileData.filename_download || fileData.id) : '';
+		const title = fileData ? escapeHtml(fileData.filename_download || fileData.id) : '';
 		const titleHtml = title ? `<div class="title" style="color: var(--theme--foreground-inverse, #fff); font-size: 14px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${title}</div>` : '';
 		
 		// Meta line 1: width x height, filesize, type
@@ -516,12 +531,12 @@ export function useReplacementPlayer(
 			metaParts1.push(formatFileSize(fileData.filesize));
 		}
 		if (fileData?.type) {
-			metaParts1.push(fileData.type);
+			metaParts1.push(escapeHtml(fileData.type));
 		}
 		const meta1Html = metaParts1.length > 0 ? `<div class="meta" style="margin-bottom: 4px;">${metaParts1.join(' • ')}</div>` : '';
 		
 		// Meta line 2: stream link filename (only in stream mode)
-		const streamFilename = (useHls.value && streamUrl && typeof streamUrl === 'string') ? streamUrl.split('/').pop() : '';
+		const streamFilename = (useHls.value && streamUrl && typeof streamUrl === 'string') ? escapeHtml(streamUrl.split('/').pop()) : '';
 		const meta2Html = streamFilename ? `<div class="meta" style="margin-bottom: 4px;">${streamFilename}</div>` : '';
 		
 		// Meta line 3: labels
@@ -530,7 +545,7 @@ export function useReplacementPlayer(
 			// Stream mode: show DASH/HLS and quality labels
 			labelParts.push(`<span class="${isDash ? 'dash' : 'hls'}-label" style="background: var(--theme--primary, #6644ff); color: var(--theme--foreground-inverse, #fff); padding: 2px 6px; border-radius: 4px; font-weight: 500; font-size: 11px;">${isDash ? 'DASH' : 'HLS'}</span>`);
 			if (replacementQuality.value) {
-				labelParts.push(`<span class="quality-label" style="background: var(--theme--primary, #6644ff); color: var(--theme--foreground-inverse, #fff); padding: 2px 6px; border-radius: 4px; font-weight: 500; font-size: 11px;">${replacementQuality.value}</span>`);
+				labelParts.push(`<span class="quality-label" style="background: var(--theme--primary, #6644ff); color: var(--theme--foreground-inverse, #fff); padding: 2px 6px; border-radius: 4px; font-weight: 500; font-size: 11px;">${escapeHtml(replacementQuality.value)}</span>`);
 			}
 		}
 		const meta3Html = labelParts.length > 0 ? `<div class="meta" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">${labelParts.join('')}</div>` : '';

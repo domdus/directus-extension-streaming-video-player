@@ -2,6 +2,16 @@
  * Utility functions for the video player interface
  */
 
+/** Escape text for use inside an innerHTML template. */
+export function escapeHtml(text: unknown): string {
+	return String(text ?? '')
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#39;');
+}
+
 /**
  * Slugify a string - convert to URL-safe format
  */
@@ -182,7 +192,7 @@ export function hlsXhrSetup(api: any) {
 /**
  * Attach Directus auth to dash.js RequestModifier (headers + access_token on /assets/ URLs).
  */
-export function applyDashAccessToken(player: { extend: (name: string, factory: any, force?: boolean) => void }, api: any) {
+export function applyDashAccessToken(player: { extend: (name: string, factory: any, force: boolean) => void }, api: any) {
 	if (!api || !player) return;
 	player.extend('RequestModifier', () => ({
 		modifyRequestHeader: (xhr: XMLHttpRequest) => {
